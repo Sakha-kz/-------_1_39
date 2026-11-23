@@ -1,0 +1,32 @@
+c237114654b94e64a07d7309c7916cba {"epoch": 1, "train_loss": 1.0971725583076477, "train_accuracy": 0.375, "val_loss": 1.1037007570266724, "val_accuracy": 0.25, "lr": 0.001, "seconds": 0.03861649999998917, "images_per_second": 414.33066176387}
+full {"epoch": 1, "train_loss": 2.0443359911441803, "train_accuracy": 0.3125, "val_loss": 1.0637990236282349, "val_accuracy": 0.3125, "lr": 0.1, "seconds": 0.19942119999996066, "images_per_second": 160.46438392711664}
+full {"epoch": 2, "train_loss": 1.7601056098937988, "train_accuracy": 0.34375, "val_loss": 1.2897299528121948, "val_accuracy": 0.1875, "lr": 0.05, "seconds": 0.192423499999677, "images_per_second": 166.29985422806317}
+resumed {"epoch": 1, "train_loss": 2.0443359911441803, "train_accuracy": 0.3125, "val_loss": 1.0637990236282349, "val_accuracy": 0.3125, "lr": 0.1, "seconds": 0.20667460000004212, "images_per_second": 154.8327660970118}
+resumed {"epoch": 2, "train_loss": 1.7601056098937988, "train_accuracy": 0.34375, "val_loss": 1.2897299528121948, "val_accuracy": 0.1875, "lr": 0.05, "seconds": 0.223010499999873, "images_per_second": 143.49100154485203}
+test_corruption_deterministic (test_core.CoreTests.test_corruption_deterministic) ... ok
+test_cutmix_area (test_core.CoreTests.test_cutmix_area) ... ok
+test_fewshot (test_core.CoreTests.test_fewshot) ... ok
+test_focal (test_core.CoreTests.test_focal) ... ok
+test_groupnorm (test_core.CoreTests.test_groupnorm) ... ok
+test_kd_gradients (test_core.CoreTests.test_kd_gradients) ... ok
+test_longtail (test_core.CoreTests.test_longtail) ... ok
+test_metric_orientation (test_core.CoreTests.test_metric_orientation) ... ok
+test_mixup_bounds (test_core.CoreTests.test_mixup_bounds) ... ok
+test_mlp_parameter_match (test_core.CoreTests.test_mlp_parameter_match) ... ok
+test_model_shapes (test_core.CoreTests.test_model_shapes) ... ok
+test_new_color (test_core.CoreTests.test_new_color) ... ok
+test_no_digit_flips (test_core.CoreTests.test_no_digit_flips) ... ok
+test_padding_does_not_mask_real_eos (test_core.CoreTests.test_padding_does_not_mask_real_eos) ... ok
+test_paired_subsets (test_core.CoreTests.test_paired_subsets) ... ok
+test_patterns (test_core.CoreTests.test_patterns) ... ok
+test_poetry_split_no_duplicate_leakage (test_core.CoreTests.test_poetry_split_no_duplicate_leakage) ... ok
+test_prepare_persists_split (test_core.CoreTests.test_prepare_persists_split) ... ok
+test_probe_freezes_bn (test_core.CoreTests.test_probe_freezes_bn) ... ok
+test_registry (test_core.CoreTests.test_registry) ... ok
+test_resume_matches_uninterrupted (test_core.CoreTests.test_resume_matches_uninterrupted) ... ok
+test_shapes_reproducible_and_independent (test_core.CoreTests.test_shapes_reproducible_and_independent) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 1.552s
+
+OK

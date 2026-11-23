@@ -1,0 +1,10 @@
+[
+  {
+    "device": "cpu",
+    "precision": "torch.float32",
+    "warmup": 20,
+    "n": 48,
+    "milliseconds": 2.9964375000114765,
+    "FPS": 333.7296372763223
+  }
+]

@@ -1,0 +1,1706 @@
+      таблице «Классический фокус вариантов» ниже. Признаки и
+      scaler/словарь обучаются ТОЛЬКО на train; оценка на val теми же
+      метриками, что и стадия 6.
+     Протокол — в «Методиках»: LinearSVC (C по умолчанию 1, при
+      дисбалансе class_weight=‘balanced’) или kNN (k=5); для SIFT-BoW словарь
+      визуальных слов fit на train.
+     Сравнение обязательно: таблица «классика vs CNN scratch vs transfer»
+      (accuracy, macro-F1, время обучения, размер модели/признаков) —
+      входит в отчёт и ответ на вопрос.
+     Вопрос анализа: какие признаки классика использует явно, а CNN
+      выучивает сама; где классика неожиданно сильнее (мало данных,
+      текстуры, интерпретируемость)?
+
+Стадия 3. Препроцессинг и аугментации
+     Нормализация (mean/std датасета или ImageNet — зафиксировать),
+      resize под архитектуру.
+     Политика аугментаций — по карточке (none / basic / strong / mixup /
+      cutmix / corruptions).
+<PARSED TEXT FOR PAGE: 5 / 41>
+     Обязательная абляция: identical модель+seed, минимум 2 прогона
+      (none vs политика варианта); Δaccuracy и кривые. Аугментации
+      применяются ТОЛЬКО к train.
+
+Стадия 4. Модель
+     Архитектура — по карточке: SmallCNN/LeNet/MLP с нуля (шаблон) или
+      torchvision/timm (ResNet, MobileNet, DenseNet, EfficientNet, ViT).
+     Параметры (факт), память, обоснование выбора под датасет; для transfer
+      — какой backbone и откуда веса.
+     Модификации по карточке (dropout, BN/GN, активации,
+      глубина/ширина) — diff приложить.
+
+Стадия 5. Обучение
+     Гиперпараметры — по карточке. По умолчанию: 30 эпох (scratch) или
+      10+10 (probe+FT), batch 128, SGD momentum 0.9, lr 0.1, cosine, weight decay
+      5e-4, early stopping patience 10.
+     Кривые train/val loss и accuracy, лог lr; замер времени эпохи и images/sec.
+     Обязательно: демонстрация resume из чекпоинта; сохранение лучшей
+      модели по val.
+
+Стадия 6. Оценка
+     На val (и один финальный раз на test): accuracy, top-3 accuracy, per-class
+      precision/recall/F1, confusion matrix (нормированная), macro-F1.
+     Error analysis: топ-5 пар путаницы из матрицы; 10 ошибочных
+      примеров с изображениями и гипотезами причин.
+     Robustness-протокол (единый, см. «Методики»): шум σ=0.05, blur 5×5,
+      яркость ±30% — падение accuracy.
+     Фокус оценки по карточке (дисбаланс, latency, калибровка и т.п.).
+
+Стадия 7. Интерпретируемость — Grad-CAM
+     Реализовать Grad-CAM (шаблон дан; ★ — варианты/аугментации CAM
+      по карточке) на последнем свёрточном слое.
+     5 верных + 5 ошибочных предсказаний: heatmap-оверлеи, анализ
+      «смотрит ли модель на объект или на фон/артефакты».
+     Вывод: какие признаки модель реально использует; связь с error
+      analysis стадии 6.
+
+Стадия 8. Перенос обучения / дообучение
+Режим — по карточке, один из: - transfer: ImageNet-backbone → linear probe
+(заморожен, 10 эпох) → full fine-tune (разморожен, lr backbone 1e-4 / head 1e-3,
+10 эпох); таблица scratch vs probe vs FT. - domain shift: обучение на домене A →
+оценка на B → дообучение на B; кривые forgetting/адаптации на обоих
+доменах. - few-shot: k примеров на класс (k из карточки), фиксированный
+<PARSED TEXT FOR PAGE: 6 / 41>
+subset; сравнение с полным обучением; 3 запуска mean±std. - imbalance: long-
+tail subset → методы (weighted loss / oversampling / focal loss — по карточке);
+per-class F1 до/после. - efficiency/SSL (★): дистилляция, прунинг/квантизация,
+self-supervised + probe — по карточке.
+
+Стадия 9. Отчёт и экономика
+      Единый отчёт по шаблону; ответ на индивидуальный вопрос;
+       обязательное сравнение классики и нейросети.
+      Latency: batch=1, 100 изображений после прогрева, среднее мс и FPS на
+       своём устройстве; для мобильных архитектур — обязательно.
+      Cost-модель: время обучения × цена (T4 ≈ $0.2/ч; CPU — Вт × тариф);
+       стоимость переобучения и 1000 инференсов.
+      Экстраполяция: что даст ×10 данных / ×10 параметров (интуиция
+       scaling).
+
+Воспроизводимость проверяется запуском кода; комбинации параметров
+уникальны. Сравнение вариантов на семинаре — часть курса (пары
+«сравнить с №N»).
+
+Шаблон отчёта
+Индивидуальное задание №__ | Студент: ____ | Группа: ____
+Устройство: ____ | PyTorch: ____ | Seed: ____ | Ссылка на код: ____
+1. Цель и индивидуальный вопрос
+2. Данные: EDA, сплиты, contact sheet
+3. Классические методы: лист обработки, признаки, baseline, сравнение с CNN
+4. Аугментации: политика, абляция none vs policy
+5. Модель: архитектура, параметры, память, модификации
+6. Обучение: кривые, throughput, resume
+7. Оценка: accuracy/P/R/F1, confusion matrix, error analysis, robustness
+8. Grad-CAM: верные/ошибочные, анализ внимания
+9. Перенос/дообучение: режим, до/после
+10. Latency + экономика
+11. Выводы: ответ на вопрос + классика vs современность
+
+
+
+
+Методики измерений (единые для всех)
+Метрики классификации
+      Accuracy = верные/все; top-k: верный класс в k лучших логитах.
+      Precision = TP/(TP+FP), Recall = TP/(TP+FN), F1 = 2PR/(P+R); macro-F1
+       (среднее по классам) — главная метрика при дисбалансе.
+      Confusion matrix: строки — истинный класс, столбцы — предсказанный;
+       нормировать по строкам; приложить heatmap.
+      Готовые функции: sklearn classification_report, confusion_matrix (шаблоны).
+<PARSED TEXT FOR PAGE: 7 / 41>
+Абляция аугментаций
+Одинаковые модель/seed/эпохи, минимум 2 прогона: none vs политика
+варианта. Отчёт: Δ val accuracy, кривые train/val (аугментации обычно ↓ train
+acc, ↑ val acc — объяснить).
+
+Robustness-протокол
+На val наложить фиксированные искажения (без переобучения, если иное не
+указано в стадии 8): гауссов шум σ=0.05 (в [0,1]), Gaussian blur 5×5, яркость
+±30%. Отчёт: accuracy на каждом искажении и падение относительно чистого
+val.
+
+Grad-CAM (процедура)
+   1. Целевой слой — последняя свёртка backbone.
+   2. Forward → логит целевого класса → backward → градиенты по картам
+      признаков.
+   3. Веса = global average pooling градиентов; CAM = ReLU(Σ вес·карта);
+      нормировать, наложить на изображение.
+   4. 5 верных + 5 ошибочных примеров; вопрос анализа: объект vs
+      фон/текстура/артефакт.
+
+Latency
+Batch=1, 100 изображений после 20 прогревочных, среднее мс/изображение и
+FPS; устройство и precision зафиксировать; сравнить архитектуры только на
+одном устройстве.
+
+Transfer-протокол
+Linear probe: backbone заморожен, обучается только голова (lr 1e-3, 10 эпох).
+Full FT: всё разморожено, lr backbone 1e-4 / head 1e-3, 10 эпох. Отчёт: scratch vs
+probe vs FT (accuracy, время, параметры обучаемые).
+
+Few-shot-протокол
+k примеров на класс (seed фиксирован), аугментации обязательны; 3 запуска
+→ mean±std; сравнить с полным обучением и с transfer.
+
+Классический baseline-протокол (стадия 2)
+      Признаки (шаблоны starter-templates-cv.md, блок «Классические
+       методы»): hog (9 ориентаций, cell 8×8, block 2×2); lbp (P=8, R=1, uniform,
+       гистограмма); colorhist (HSV 8×8×8); raw (grayscale, resize 16×16); hu (7
+       инвариантных моментов Hu по Otsu-маске); sift-bow (SIFT-дескрипторы
+       → словарь визуальных слов KMeans=64, fit на train → гистограмма слов).
+<PARSED TEXT FOR PAGE: 8 / 41>
+       Все fit-операции (scaler, словарь, классификатор) — только на train;
+        val/test — только transform. Утечка словаря/scaler с val =
+        недействительный результат.
+       Классификатор: LinearSVC (C=1, max_iter 10000) или kNN (k=5); при
+        дисбалансе — class_weight=‘balanced’. Для №34 — sweep C ∈ {0.1, 1, 10}.
+       Метрики — те же, что в стадии 6 (accuracy, macro-F1, per-class P/R/F1); в
+        таблицу сравнения добавить время обучения и размерность
+        признаков/размер модели.
+       Лист обработки: sobel, canny (sigma=1), otsu, binary opening/closing (disk
+        2), skeletonize — на 3 изображениях датасета, параметры в подписях.
+       Итог стадии: таблица «классика vs CNN scratch vs transfer» на одном val
+        + вывод, где ручные признаки выигрывают/проигрывают и почему.
+
+Классический фокус вариантов (стадия 2)
+№                             Признаки +                  Вопрос анализа
+                              классификатор               классики
+1                             HOG + LinearSVC             эталонный baseline:
+                                                          почему HOG
+                                                          проигрывает CNN на
+                                                          32×32
+2                             HOG vs raw pixels +         сколько даёт feature
+                              LinearSVC                   engineering против
+                                                          «сырых пикселей»
+3                             SIFT-BoW (64 слова) +       работают ли локальные
+                              LinearSVC                   особенности на мелких
+                                                          изображениях
+4                             HOG + kNN (k=5)             метрический
+                                                          классификатор на 10
+                                                          суперклассах
+5                             raw pixels + kNN vs HOG + MNIST почти решается
+                              kNN                       классикой: где потолок
+                                                        и что мешает
+6                             raw pixels + LinearSVC      визуализировать HOG
+                                                          цифр: что «видит»
+                                                          дескриптор
+7                             HOG vs LBP + LinearSVC      форма или текстура
+                                                          важнее для одежды
+8                             LBP + LinearSVC             текстурный дескриптор
+                                                          на одежде: per-class F1
+9                             HOG + kNN                   сложные штрихи
+                                                          кандзи: где ошибается
+                                                          классика
+<PARSED TEXT FOR PAGE: 9 / 41>
+№    Признаки +                   Вопрос анализа
+     классификатор                классики
+10   HOG + LinearSVC              дисбаланс: accuracy vs
+     (balanced)                   macro-F1 у классики
+11   colorhist (HSV) vs HOG +     сколько даёт цвет на
+     LinearSVC                    SVHN
+12   Canny-границы + HOG по       робастность
+     границам + LinearSVC         классических признаков
+                                  к шуму/blur
+13   SIFT-BoW + LinearSVC         transfer vs классика при
+                                  малых данных
+14   SIFT-BoW + LinearSVC         fine-grained: различают
+                                  ли виды локальные
+                                  особенности
+15   colorhist + HOG (concat) +   комбинация
+     LinearSVC                    цвет+форма на цветах
+16   LBP + LinearSVC              текстуры без формы:
+                                  родная стихия
+                                  классики?
+17   colorhist + HOG +            спутники: цвет vs
+     LinearSVC                    структура местности
+18   HOG + LinearSVC              scratch CNN vs классика
+                                  на не-ImageNet домене
+19   HOG + colorhist +            классика как домен-
+     LinearSVC                    независимая точка
+                                  отсчёта
+20   HOG + LinearSVC              latency классического
+                                  пайплайна vs
+                                  MobileNetV3
+21   SIFT-BoW + LinearSVC         признаки пород: что
+                                  ловят SIFT-ключевые
+                                  точки
+22   colorhist + LBP +            еда: цвет или
+     LinearSVC                    микротекстура
+23   LBP + LinearSVC              mixup/cutmix vs
+                                  классика: кто
+                                  устойчивее к
+                                  смешиванию текстур
+24   SIFT-BoW + LinearSVC         исторический пайплайн
+                                  Caltech: воспроизвести
+                                  до-DL подход
+<PARSED TEXT FOR PAGE: 10 / 41>
+№    Признаки +               Вопрос анализа
+     классификатор            классики
+25   raw pixels + kNN;        разреженные скетчи:
+     skeletonize + HOG        штрихи vs формы
+26   HOG + LinearSVC +        классический до-DL
+     цветовые маски           пайплайн дорожных
+     (красный/синий)          знаков
+27   HSV-сегментация цвета    сегментация как
+     + HOG + LinearSVC        признак для знаков
+28   HOG + LinearSVC          bias ручных признаков:
+                              этическое сравнение с
+                              CNN
+29   моменты Hu + kNN         распознавание форм
+                              инвариантными
+                              моментами: новый цвет
+                              известной формы
+30   моменты Hu vs raw        откуда берётся
+     pixels + kNN             пространственная
+                              инвариантность в
+                              классике
+31   HOG + LinearSVC          фиксированная точка
+                              отсчёта для абляции
+                              аугментаций
+32   HOG + LinearSVC          точка отсчёта: sweep
+                              оптимизаторов vs
+                              классика без
+                              оптимизации
+33   HOG + LinearSVC          точка отсчёта:
+                              расписания LR vs
+                              классика
+34   HOG + LinearSVC, sweep C регуляризация в SVM (C)
+     ∈ {0.1, 1, 10}           vs регуляризаторы CNN
+35   HOG + LinearSVC          long-tail: class_weight vs
+     (balanced)               focal loss у CNN
+36   HOG + LinearSVC          третья точка: teacher
+                              CNN vs student vs
+                              классика
+37   HOG + LinearSVC          deployment-эталон:
+                              размер/latency
+                              классического
+                              пайплайна
+<PARSED TEXT FOR PAGE: 11 / 41>
+№                          Признаки +                  Вопрос анализа
+                           классификатор               классики
+38                         HOG + LinearSVC             точка отсчёта кривой
+                                                       label-efficiency (SSL vs
+                                                       классика)
+39                         HOG + SIFT-BoW +            полный классический
+                           colorhist (concat) +        стек vs DL-ансамбль
+                           LinearSVC
+
+
+
+Карточки вариантов
+Как читать карточку (обязательно к прочтению перед стартом)
+Каждая карточка — это полный маршрут по 9 стадиям общего пайплайна
+(баллы за стадии — там же). Ниже — что означает каждая строка и как
+запускать код, чтобы не гадать.
+
+Строки карточки: - Суть — датасет, модель и главный фокус варианта одной
+фразой. - Вопрос — исследовательский вопрос, на который ты отвечаешь в
+выводах отчёта (стадия 9). -. - Что делать по стадиям — 9 конкретных шагов.
+Шаг N = стадия N−1 общего пайплайна (шаг 1 = стадии 0–1, шаг 2 = стадия 2, …,
+шаг 9 = стадия 9). Делай их по порядку. - Команды — готовые train.py /
+evaluate.py под твой вариант (подставь свой --seed и пути). - Артефакты — что
+именно сдать (графики, таблицы, код, чекпоинты). - Ловушка — типичная
+ошибка, из-за которой результат недействителен или вопрос остаётся без
+ответа.
+
+Общие правила для всех (не повторяются в каждой карточке): - Seed = 1000
++ № варианта (например, №7 → 1007). Один seed на все прогоны варианта,
+если карточка не требует иного. - Код: сохрани блоки 12 и 13 из starter-
+templates-cv.md как train.py и evaluate.py; блоки 1–11 — как модуль cvkit.py (или
+вставь в ноутбук). Все команды ниже предполагают, что файлы рядом. -
+Scratch (с нуля): нормализация статистиками датасета (--norm dataset), размер
+родной. Transfer (ImageNet-веса): обязательно --norm imagenet --size 224 и --
+pretrained. - Аугментации только на train. Политики --aug: none / basic
+(flip+crop) / strong (RandAugment) / rotate10|15|20 / noise. Для цифр и букв
+(MNIST/KMNIST/EMNIST/SVHN) flip запрещён — он меняет смысл символа;
+используй rotate-политики. mixup/cutmix — отдельные флаги --mixup 1.0 / --
+cutmix 1.0. - Абляция аугментаций обязательна: минимум 2 прогона (none vs
+политика варианта) при одинаковых модели/seed/эпохах; в отчёт — Δ val
+accuracy и кривые. - Test не трогается до финального замера (один раз, --split
+test). - Resume обязателен: прерви обучение и продолжи --resume из last.pt;
+лучшая модель сохраняется в best.pt по val. - Grad-CAM (шаг 7): 5 верных + 5
+ошибочных примеров, целевой слой — last_conv(model); анализ «объект vs
+<PARSED TEXT FOR PAGE: 12 / 41>
+фон/артефакт». - Отчёт (шаг 9): по шаблону выше; latency по протоколу
+(batch=1, 100 изображений после 20 прогревочных); cost-модель (T4 ≈ $0.2/ч);
+обязательная таблица «классика vs CNN scratch vs transfer».
+
+Универсальные команды (подставь значения из карточки):
+
+# обучение с нуля
+python train.py --dataset <DATASET> --model <MODEL> --aug <POLICY> \
+  --optimizer sgd --lr 0.1 --scheduler cosine --wd 5e-4 --epochs 30 \
+  --batch_size 128 --seed <1000+№> --out_dir drive/out-var<№>
+# resume после обрыва
+python train.py --dataset <DATASET> --model <MODEL> --aug <POLICY> \
+  --seed <1000+№> --out_dir drive/out-var<№> --resume
+# оценка val + классика + лист обработки + Grad-CAM + robustness + latency
+python evaluate.py --ckpt drive/out-var<№>/best.pt --dataset <DATASET> --model <MODEL>
+\
+  --split val --seed <1000+№> --classical <hog|lbp|colorhist|raw|hu|siftbow> \
+  --processing --gradcam --robustness --latency --out_dir drive/eval-var<№>
+# для transfer-модели добавь: --norm imagenet --size 224
+
+Что делается КОДОМ, а не одним флагом (в карточке указано «блок N»): -
+Классика с kNN / balanced / concat / sweep C / масками / Canny-HOG /
+skeletonize — флаг --classical умеет только один признак + LinearSVC. Для
+остальных техник пиши короткий скрипт на функциях блока 4 (те же
+сплиты, что у CNN):
+
+from cvkit import get_datasets, raw_items, classical_features, classical_baseline, SiftBoW
+import numpy as np
+data = get_datasets('<DATASET>', policy='none', seed=<1000+№>)            # size/norm как у CNN
+tr, va = raw_items(data, 'train'), raw_items(data, 'val')
+ytr, yva = [y for _, y in tr], [y for _, y in va]
+Xtr = classical_features([im for im, _ in tr], 'hog')       # kind из карточки
+Xva = classical_features([im for im, _ in va], 'hog')
+classical_baseline(Xtr, ytr, Xva, yva, clf='knn')          # или clf='svm', balanced=True, C=10
+# concat нескольких признаков:
+# Xtr = np.concatenate([classical_features([im for im,_ in tr], k) for k in ('colorhist','hog')],
+axis=1)
+# siftbow: bow = SiftBoW(64, seed=<1000+№>).fit([im for im,_ in tr]); затем kind='siftbow',
+bow=bow
+
+      Transfer probe→FT, постепенная разморозка — блок 9: freeze_backbone,
+       make_ft_param_groups, train(cfg с param_groups). Флаг --pretrained даёт только
+       полный FT с одним lr; probe (заморозка) и разный lr backbone/head —
+       кодом.
+      few-shot / long-tail — блок 3: few_shot_indices(targets, k, seed),
+       long_tail_indices(targets, ratio, seed); подставь индексы в Wrapped train-
+       сплита.
+<PARSED TEXT FOR PAGE: 13 / 41>
+      domain shift — обучи на A, оцени на B (get_datasets('B')), дообучи на B;
+       кривые forgetting/адаптации на обоих доменах.
+      Дистилляция / прунинг / квантизация / SSL / TTA — блок 11 (отправные
+       точки kd_loss, tta_predict; реализация — твоя, ★).
+      Субсеты классов (CIFAR-100→10 суперклассов, Flowers102→20,
+       Food-101→10, Caltech-101→10, QuickDraw→10): отбери классы по seed и
+       отфильтруй Wrapped.indices — это часть стадии 1.
+
+
+№1. CIFAR-10 + SmallCNN — эталонный ★ (разобран в образце)
+Суть: CIFAR-10 32×32, SmallCNN с нуля; эталонный вариант, полностью
+разобран в primer-vypolneniya-cv-variant-1.md. Вопрос: каков потолок маленькой
+CNN с нуля и сколько даёт ImageNet-перенос? : сравнить с №2 (ResNet-18
+scratch) на семинаре.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1001. --dataset cifar10 (10
+классов, 32×32, 3 канала). Сплит: официальный train/test, train делим 90/10 на
+train/val. EDA: гистограмма классов, contact sheet по 3 примера на класс. 2.
+Классика (ст. 2). Лист обработки на 3 изображениях. Baseline: HOG +
+LinearSVC — --classical hog. Сравни с CNN в таблице. 3. Аугментации (ст. 3).
+Политика basic (flip+crop). Абляция: none vs basic, одинаковый seed. 4. Модель
+(ст. 4). smallcnn (3 conv-блока, ~1.15M параметров). Посчитай params и память,
+обоснуй выбор под 32×32. 5. Обучение (ст. 5). SGD lr 0.1, cosine, wd 5e-4, 30
+эпох, batch 128. Кривые loss/acc, resume, best.pt. 6. Оценка (ст. 6). Полная:
+accuracy/top-3/macro-F1, per-class P/R/F1, confusion matrix, error analysis (топ-5
+пар + 10 ошибок), robustness. 7. Grad-CAM (ст. 7). 5 верных + 5 ошибочных;
+смотрит ли модель на объект или на фон. 8. Перенос (ст. 8). transfer
+ResNet-18: блок 9, probe (заморожен, 10 эп) → FT (backbone 1e-4 / head 1e-3, 10
+эп), --norm imagenet --size 224. Таблица scratch vs probe vs FT. 9. Отчёт (ст. 9).
+Latency, cost-модель, ответ на вопрос, таблица «классика vs scratch vs transfer».
+
+Команды:
+
+python train.py --dataset cifar10 --model smallcnn --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1001 --out_dir drive/out-var1
+python evaluate.py --ckpt drive/out-var1/best.pt --dataset cifar10 --model smallcnn \
+ --split val --seed 1001 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var1
+
+Артефакты: EDA + contact sheet, лист обработки, таблица
+классика/CNN/transfer, кривые, confusion matrix, Grad-CAM, отчёт. Ловушка:
+сравнивать классику и CNN на разных сплитах/seed — таблица сравнения
+недействительна.
+<PARSED TEXT FOR PAGE: 14 / 41>
+№2. CIFAR-10 + ResNet-18
+Суть: CIFAR-10, ResNet-18 в двух режимах (scratch и transfer); фокус —
+экономия от ImageNet-предобучения. Вопрос: сколько эпох и данных
+экономит ImageNet-предобучение (кривые accuracy vs эпоха)? : сравнить
+заморозку 0/50/100% backbone.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1002. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG vs raw pixels + LinearSVC: два
+прогона (--classical hog и --classical raw), сравни, сколько даёт feature engineering.
+3. Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст. 4). resnet18.
+Params/память; для transfer — веса ImageNet (--pretrained). 5. Обучение (ст. 5).
+Scratch: SGD lr 0.1 cosine, 30 эпох. Transfer: probe→FT 10+10 (блок 9). Кривые,
+resume. 6. Оценка (ст. 6). Полная + robustness; наложи кривые accuracy vs
+эпоха для scratch и transfer. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос
+(ст. 8). График разморозки: блок 9, постепенно unfreeze последние блоки
+(layer4 → layer3 → …), замеряй val acc после каждого шага. 9. Отчёт (ст. 9).
+Latency, cost, ответ на вопрос (экономия эпох/данных), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1002 --out_dir drive/out-var2-scratch
+python evaluate.py --ckpt drive/out-var2-scratch/best.pt --dataset cifar10 --model resnet18 \
+ --split val --seed 1002 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var2
+
+Артефакты: кривые scratch vs transfer, график разморозки, таблица HOG vs
+raw, отчёт. Ловушка: для transfer забыть --norm imagenet --size 224 — качество
+просядет, вывод об экономии будет неверным.
+
+№3. CIFAR-10 + ViT
+Суть: CIFAR-10, ViT-tiny (timm) scratch и transfer; фокус — «голодность»
+трансформеров до данных. Вопрос: правда ли ViT «голоднее до данных» — что
+происходит на 50k CIFAR? : attention rollout вместо Grad-CAM (для ViT).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1003. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. SIFT-BoW (64 слова) + LinearSVC: --
+classical siftbow (словарь fit на train). Работают ли локальные особенности на
+32×32? 3. Аугментации (ст. 3). strong (RandAugment). Абляция none vs strong. 4.
+Модель (ст. 4). vit_tiny (timm vit_tiny_patch16_224). Params/память; transfer — --
+pretrained. 5. Обучение (ст. 5). AdamW lr 3e-4, 40 эпох. Scratch и transfer
+(probe→FT, блок 9). Кривые, resume. 6. Оценка (ст. 6). Полная + robustness;
+сравни с CNN (№1/№2) при равном бюджете. 7. Grad-CAM (ст. 7). Для ViT —
+attention rollout (бонус) или CAM по patch-embedding; 5+5. 8. Перенос (ст. 8).
+transfer ViT: probe→FT; таблица scratch vs probe vs FT и сравнение с CNN. 9.
+<PARSED TEXT FOR PAGE: 15 / 41>
+Отчёт (ст. 9). Latency, cost, ответ на вопрос (data hunger), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model vit_tiny --aug strong --optimizer adamw --lr 3e-4 \
+ --scheduler cosine --epochs 40 --size 224 --seed 1003 --out_dir drive/out-var3-scratch
+python evaluate.py --ckpt drive/out-var3-scratch/best.pt --dataset cifar10 --model vit_tiny \
+ --size 224 --split val --seed 1003 --classical siftbow --processing --gradcam --robustness --
+latency --out_dir drive/eval-var3
+
+Артефакты: кривые ViT scratch vs transfer, attention rollout, сравнение с CNN,
+отчёт. Ловушка: ViT scratch на 50k без strong-аугментаций сильно
+переобучается — не делай вывод о «голодности» без абляции аугментаций.
+
+№4. CIFAR-100 (10 суперклассов) + ResNet-20
+Суть: CIFAR-100, subset из 10 суперклассов, ResNet-20 scratch; фокус — рост
+сложности с числом классов. Вопрос: как растёт сложность задачи с числом
+классов (сравнить с №1)? : ошибка «внутри суперкласса» vs «между
+суперклассами» — разбор матрицы.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1004. cifar100, отбери 10
+суперклассов (coarse labels) по seed, отфильтруй Wrapped.indices. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + kNN (k=5): код блока 4,
+clf='knn'. Метрический классификатор на 10 суперклассах. 3. Аугментации (ст.
+3). basic. Абляция none vs basic. 4. Модель (ст. 4). resnet20 (ResNetCIFAR, в
+torchvision готового нет). Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine,
+30 эпох. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; confusion
+matrix по суперклассам. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст.
+8). transfer + иерархия: ResNet-18 ImageNet probe→FT; сравни ошибку внутри
+суперкласса vs между суперклассами. 9. Отчёт (ст. 9). Latency, cost, ответ на
+вопрос (сравнение с №1), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar100 --model resnet20 --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1004 --out_dir drive/out-var4
+python evaluate.py --ckpt drive/out-var4/best.pt --dataset cifar100 --model resnet20 \
+ --split val --seed 1004 --processing --gradcam --robustness --latency --out_dir drive/eval-var4
+
+Артефакты: subset-скрипт, confusion matrix, разбор иерархии ошибок,
+таблица HOG+kNN, отчёт. Ловушка: классику (kNN) считать через --classical —
+флаг не умеет kNN; нужен код блока 4.
+<PARSED TEXT FOR PAGE: 16 / 41>
+№5. MNIST + LeNet-5 ★ (CPU-friendly)
+Суть: MNIST, LeNet-5 scratch; фокус — потолок ~99% и разбор оставшегося 1%.
+Вопрос: где потолок ~99% и что мешает оставшемуся 1% (разбор всех
+ошибок)? : ensemble из 3 моделей — добить до 99.5%+.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1005. mnist (28×28, 1 канал).
+EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. raw pixels + kNN vs
+HOG + kNN: код блока 4, clf='knn', два kind (raw, hog). Где потолок классики? 3.
+Аугментации (ст. 3). rotate10 (повороты ±10°, без flip — цифры). Абляция none
+vs rotate10. 4. Модель (ст. 4). lenet (LeNet-5). Params/память; CPU-friendly. 5.
+Обучение (ст. 5). SGD lr 0.1 cosine, 15 эпох, batch 128. Кривые, resume. 6.
+Оценка (ст. 6). Полная + robustness; разбери ВСЕ ошибки на val (их немного).
+7. Grad-CAM (ст. 7). 5+5; на какие штрихи смотрит модель. 8. Перенос (ст. 8).
+domain shift → KMNIST: оцени MNIST-модель на kmnist, дообучи на KMNIST;
+кривые forgetting/адаптации. 9. Отчёт (ст. 9). Latency (CPU), cost, ответ на
+вопрос (потолок 99%), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset mnist --model lenet --aug rotate10 --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 15 --seed 1005 --out_dir drive/out-var5
+python evaluate.py --ckpt drive/out-var5/best.pt --dataset mnist --model lenet \
+ --split val --seed 1005 --processing --gradcam --robustness --latency --out_dir drive/eval-var5
+
+Артефакты: разбор всех ошибок, таблица raw+kNN vs HOG+kNN, кривые
+domain shift, отчёт. Ловушка: применить flip к цифрам — часть ошибок
+станет искусственной; используй rotate.
+
+№6. MNIST + MLP ★ (CPU-friendly)
+Суть: MNIST, MLP (2 скрытых слоя) scratch; фокус — нужны ли свёртки для
+MNIST. Вопрос: нужны ли свёртки для MNIST — MLP vs LeNet (№5) при равных
+params? : визуализировать выученные веса первого слоя (что выучил MLP).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1006. mnist. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. raw pixels + LinearSVC: --classical raw.
+Визуализируй HOG цифр (что «видит» дескриптор). 3. Аугментации (ст. 3).
+none vs noise (гауссов шум σ=0.05). Абляция обязательна. 4. Модель (ст. 4). mlp
+(2 скрытых слоя). Подбери ширину так, чтобы params ≈ LeNet №5; зафиксируй
+факт. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 15 эпох. Кривые, resume. 6. Оценка
+(ст. 6). Полная + robustness; сравни с LeNet (№5) при равных params. 7. Grad-
+CAM (ст. 7). Для MLP — saliency/визуализация весов первого слоя (бонус); 5+5
+ошибок. 8. Перенос (ст. 8). few-shot k=10 на класс: блок 3
+few_shot_indices(targets, 10, seed), 3 запуска mean±std; сравни с полным
+обучением. 9. Отчёт (ст. 9). Latency (CPU), cost, ответ на вопрос (нужны ли
+свёртки), таблица классика/scratch/few-shot.
+<PARSED TEXT FOR PAGE: 17 / 41>
+Команды:
+
+python train.py --dataset mnist --model mlp --aug noise --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 15 --seed 1006 --out_dir drive/out-var6
+python evaluate.py --ckpt drive/out-var6/best.pt --dataset mnist --model mlp \
+ --split val --seed 1006 --classical raw --processing --robustness --latency --out_dir drive/eval-
+var6
+
+Артефакты: визуализация весов 1-го слоя, таблица MLP vs LeNet, few-shot
+mean±std, отчёт. Ловушка: сравнивать MLP и LeNet без выравнивания params
+— вывод о свёртках будет некорректным.
+
+№7. Fashion-MNIST + SmallCNN ★
+Суть: Fashion-MNIST, SmallCNN scratch; фокус — одежда vs цифры
+(текстуры/формы). Вопрос: одежда vs цифры: что сложнее и почему
+(текстуры/формы)? : per-class F1 — какие предметы одежды путаются.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1007. fashion_mnist (28×28, 1
+канал). EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. HOG vs LBP +
+LinearSVC: два прогона (--classical hog, --classical lbp). Форма или текстура
+важнее? 3. Аугментации (ст. 3). basic (flip+crop допустим для одежды).
+Абляция none vs basic. 4. Модель (ст. 4). smallcnn. Params/память. 5. Обучение
+(ст. 5). SGD lr 0.1 cosine, 30 эпох. Кривые, resume. 6. Оценка (ст. 6). Полная +
+robustness; per-class F1 (бонус) — какие предметы путаются. 7. Grad-CAM (ст.
+7). 5+5; объект vs фон/текстура. 8. Перенос (ст. 8). domain shift → MNIST:
+оцени на mnist, дообучи; кривые forgetting/адаптации. 9. Отчёт (ст. 9). Latency,
+cost, ответ на вопрос (одежда vs цифры), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset fashion_mnist --model smallcnn --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1007 --out_dir drive/out-var7
+python evaluate.py --ckpt drive/out-var7/best.pt --dataset fashion_mnist --model smallcnn \
+ --split val --seed 1007 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var7
+
+Артефакты: таблица HOG vs LBP, per-class F1, кривые domain shift, отчёт.
+Ловушка: для LBP забыть нормировку гистограммы — она уже в шаблоне, не
+дублируй и не ломай.
+
+№8. Fashion-MNIST + ResNet-18 transfer
+Суть: Fashion-MNIST, ResNet-18 transfer; фокус — эффективность linear probe.
+Вопрос: сколько % качества FT даёт probe при ~1% обучаемых параметров? :
+probe на признаках разных глубин (layer2/3/4).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1008. fashion_mnist. EDA +
+contact sheet. 2. Классика (ст. 2). Лист обработки. LBP + LinearSVC: --classical lbp.
+<PARSED TEXT FOR PAGE: 18 / 41>
+Per-class F1 текстурного дескриптора. 3. Аугментации (ст. 3). basic. Абляция
+none vs basic. 4. Модель (ст. 4). resnet18 + ImageNet (--pretrained). Grayscale→3
+канала: повтори канал x.repeat(1,3,1,1) или адаптируй первый conv (блок 5).
+Params/память. 5. Обучение (ст. 5). Transfer: probe (10 эп) → FT (10 эп), блок 9, --
+norm imagenet --size 224. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness;
+посчитай долю обучаемых params в probe vs FT. 7. Grad-CAM (ст. 7). 5+5;
+объект vs фон. 8. Перенос (ст. 8). linear probe vs full FT (полный протокол):
+таблица scratch vs probe vs FT (acc, время, обучаемые params). Бонус — probe
+на layer2/3/4. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (эффективность
+probe), таблица классика/scratch/probe/FT.
+
+Команды:
+
+python train.py --dataset fashion_mnist --model resnet18 --pretrained --aug basic --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1008 --out_dir
+drive/out-var8-ft
+python evaluate.py --ckpt drive/out-var8-ft/best.pt --dataset fashion_mnist --model resnet18 \
+ --norm imagenet --size 224 --split val --seed 1008 --classical lbp --processing --gradcam --
+robustness --latency --out_dir drive/eval-var8
+
+Артефакты: таблица probe vs FT (params/acc), probe по глубинам (бонус),
+отчёт. Ловушка: probe без заморозки BN (переведи backbone в eval) —
+статистики BN «протекают», probe перестаёт быть честным.
+
+№9. KMNIST + SmallCNN ★
+Суть: KMNIST (кандзи), SmallCNN scratch; фокус — сложные штрихи и
+визуальный разбор ошибок. Вопрос: сложные штрихи кандзи: где ошибки
+(визуальный разбор 20 ошибок)? : сравнить с №5 (MNIST) — сложность
+письменностей.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1009. kmnist (28×28, 1 канал).
+EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. HOG + kNN: код блока
+4, clf='knn'. Где ошибается классика на штрихах? 3. Аугментации (ст. 3).
+rotate15 (±15°, без flip). Абляция none vs rotate15. 4. Модель (ст. 4). smallcnn.
+Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 30 эпох. Кривые, resume.
+6. Оценка (ст. 6). Полная + robustness; визуальный разбор 20 ошибок. 7. Grad-
+CAM (ст. 7). 5+5; на какие штрихи смотрит модель. 8. Перенос (ст. 8). domain
+shift → EMNIST: оцени на emnist, дообучи; кривые forgetting/адаптации. 9.
+Отчёт (ст. 9). Latency, cost, ответ на вопрос (разбор 20 ошибок), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset kmnist --model smallcnn --aug rotate15 --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1009 --out_dir drive/out-var9
+<PARSED TEXT FOR PAGE: 19 / 41>
+python evaluate.py --ckpt drive/out-var9/best.pt --dataset kmnist --model smallcnn \
+ --split val --seed 1009 --processing --gradcam --robustness --latency --out_dir drive/eval-var9
+
+Артефакты: разбор 20 ошибок с изображениями, таблица HOG+kNN,
+сравнение с MNIST, отчёт. Ловушка: kNN через --classical не запустится —
+нужен код блока 4.
+
+№10. EMNIST letters + LeNet ★
+Суть: EMNIST letters (26 классов, естественный дисбаланс), LeNet scratch; фокус
+— дисбаланс и macro-F1. Вопрос: как дисбаланс классов искажает accuracy и
+что лечит macro-F1? : focal loss третьим методом.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1010. emnist (letters, 26
+классов). EDA: гистограмма частотности букв (дисбаланс виден сразу). 2.
+Классика (ст. 2). Лист обработки. HOG + LinearSVC (balanced): код блока 4,
+balanced=True. Сравни accuracy vs macro-F1 у классики. 3. Аугментации (ст. 3).
+rotate10 (буквы — без flip). Абляция none vs rotate10. 4. Модель (ст. 4). lenet.
+Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 20 эпох. Кривые, resume.
+6. Оценка (ст. 6). Полная + robustness; главная метрика — macro-F1, per-class
+P/R/F1, confusion matrix. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст.
+8). imbalance: weighted loss (nn.CrossEntropyLoss(weight=...)) vs oversampling
+(WeightedRandomSampler); per-class F1 до/после. Бонус — focal loss. 9. Отчёт (ст.
+9). Latency, cost, ответ на вопрос (accuracy vs macro-F1), таблица
+классика/scratch/imbalance.
+
+Команды:
+
+python train.py --dataset emnist --model lenet --aug rotate10 --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 20 --seed 1010 --out_dir drive/out-var10
+python evaluate.py --ckpt drive/out-var10/best.pt --dataset emnist --model lenet \
+ --split val --seed 1010 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var10
+
+Артефакты: гистограмма частот, таблица accuracy vs macro-F1, per-class F1
+до/после, отчёт. Ловушка: судить о качестве по accuracy при дисбалансе —
+редкие буквы «тонут»; смотри macro-F1.
+
+№11. SVHN + ResNet-20
+Суть: SVHN (цифры на фото), ResNet-20 scratch; фокус — сколько ёмкости
+съедают фон и цвет. Вопрос: сколько ёмкости съедают фон и цвет (сравнить с
+№5)? : Grad-CAM — смотрит ли модель на цифру или на фон.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1011. svhn (label 0 = цифра 10
+— учти при подписях). EDA + contact sheet. 2. Классика (ст. 2). Лист обработки.
+colorhist (HSV) vs HOG + LinearSVC: два прогона (--classical colorhist, --classical
+hog). Сколько даёт цвет? 3. Аугментации (ст. 3). Crop + ColorJitter, без flip
+(цифры): правь basic в блоке 2 (убери flip, добавь T.ColorJitter). Абляция none vs
+<PARSED TEXT FOR PAGE: 20 / 41>
+policy. 4. Модель (ст. 4). resnet20. Params/память. 5. Обучение (ст. 5). SGD lr 0.1
+cosine, 30 эпох. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; сравни с
+MNIST (№5). 7. Grad-CAM (ст. 7). 5+5; ключевой вопрос — цифра vs фон
+(бонус). 8. Перенос (ст. 8). domain shift → MNIST: оцени на mnist, дообучи;
+кривые forgetting/адаптации. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос
+(фон/цвет), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset svhn --model resnet20 --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1011 --out_dir drive/out-var11
+python evaluate.py --ckpt drive/out-var11/best.pt --dataset svhn --model resnet20 \
+ --split val --seed 1011 --classical colorhist --processing --gradcam --robustness --latency --
+out_dir drive/eval-var11
+
+Артефакты: таблица colorhist vs HOG, Grad-CAM цифра/фон, сравнение с
+MNIST, отчёт. Ловушка: оставить flip в basic для SVHN — цифры искажаются;
+и перепутать label 0 с цифрой 0 (это 10).
+
+№12. SVHN + robustness
+Суть: SVHN, SmallCNN scratch; фокус — устойчивость к искажениям
+(corruptions). Вопрос: что эффективнее против искажений: аугментации при
+обучении или дообучение? : кривая accuracy vs σ шума (5 точек).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1012. svhn. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. Canny-границы + HOG по границам
++ LinearSVC: код блока 4 (canny → hog на карте границ). Робастность
+классических признаков к шуму/blur. 3. Аугментации (ст. 3). Базово none;
+абляция none vs noise/blur-аугментации. Фокус — corruptions. 4. Модель (ст.
+4). smallcnn. Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 30 эпох.
+Кривые, resume. 6. Оценка (ст. 6). Полная + расширенный robustness:
+шум/blur/яркость + JPEG-артефакты; падение acc на каждом. 7. Grad-CAM (ст.
+7). 5+5; объект vs фон/артефакт. 8. Перенос (ст. 8). Дообучение на
+искажённых данных: fine-tune на train с corruption-аугментациями; сравни
+«аугментации при обучении» vs «дообучение». 9. Отчёт (ст. 9). Latency, cost,
+ответ на вопрос (что эффективнее), кривая acc vs σ (бонус), таблица
+классика/scratch/robust-FT.
+
+Команды:
+
+python train.py --dataset svhn --model smallcnn --aug none --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1012 --out_dir drive/out-var12
+python evaluate.py --ckpt drive/out-var12/best.pt --dataset svhn --model smallcnn \
+ --split val --seed 1012 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var12
+
+Артефакты: таблица corruptions (вкл. JPEG), кривая acc vs σ, сравнение
+аугментации vs дообучение, отчёт. Ловушка: Canny-HOG через --classical не
+<PARSED TEXT FOR PAGE: 21 / 41>
+собрать — это код блока 4; и не забудь JPEG-артефакты (их нет в базовом
+robustness).
+
+№13. STL-10 + ResNet-18 transfer
+Суть: STL-10 (96×96), ResNet-18 transfer; фокус — transfer при малых данных.
+Вопрос: сколько примеров нужно для 90% качества полного обучения
+(transfer + мало данных)? : использовать unlabeled-сплит STL-10 (pseudo-
+labels).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1013. stl10 (10 классов, 96×96;
+есть +100k unlabeled). EDA + contact sheet. 2. Классика (ст. 2). Лист обработки.
+SIFT-BoW + LinearSVC: --classical siftbow. Transfer vs классика при малых
+данных. 3. Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст. 4).
+resnet18 + ImageNet (--pretrained). Params/память. 5. Обучение (ст. 5). Transfer:
+probe→FT 10+10 (блок 9), --norm imagenet --size 224. Кривые, resume. 6. Оценка
+(ст. 6). Полная + robustness. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос
+(ст. 8). few-shot k=50 на класс: блок 3 few_shot_indices(targets, 50, seed), 3 запуска
+mean±std; кривая «качество vs число примеров», найди точку 90%. 9. Отчёт
+(ст. 9). Latency, cost, ответ на вопрос (сколько примеров для 90%), таблица
+классика/scratch/transfer/few-shot.
+
+Команды:
+
+python train.py --dataset stl10 --model resnet18 --pretrained --aug basic --norm imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1013 --out_dir
+drive/out-var13-ft
+python evaluate.py --ckpt drive/out-var13-ft/best.pt --dataset stl10 --model resnet18 \
+ --norm imagenet --size 224 --split val --seed 1013 --classical siftbow --processing --gradcam --
+robustness --latency --out_dir drive/eval-var13
+
+Артефакты: кривая качество vs k, few-shot mean±std, pseudo-labels (бонус),
+отчёт. Ловушка: few-shot без аугментаций и без 3 запусков — разброс не
+оценить, протокол не выполнен.
+
+№14. Flowers102 (20 классов) + ResNet-18
+Суть: Flowers102 subset 20 классов, ResNet-18; фокус — fine-grained путаница
+видов. Вопрос: топ-5 пар путаницы — чем похожи confundируемые виды? :
+Grad-CAM на пары путаницы — на какие детали смотрит модель.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1014. flowers102, отбери 20
+классов по seed, отфильтруй Wrapped.indices. EDA + contact sheet. 2. Классика
+(ст. 2). Лист обработки. SIFT-BoW + LinearSVC: --classical siftbow. Различают ли
+виды локальные особенности? 3. Аугментации (ст. 3). strong. Абляция none vs
+strong. 4. Модель (ст. 4). resnet18 + ImageNet. Params/память. 5. Обучение (ст.
+5). Transfer: probe→FT 10+10 (блок 9), --norm imagenet --size 224. Кривые, resume. 6.
+Оценка (ст. 6). Полная + robustness; топ-5 пар путаницы из confusion matrix. 7.
+<PARSED TEXT FOR PAGE: 22 / 41>
+Grad-CAM (ст. 7). 5+5; бонус — CAM на confundируемые пары (какие детали
+различает модель). 8. Перенос (ст. 8). transfer + fine-grained FT: полный FT с
+малым lr backbone; сравни probe vs FT на мелких различиях. 9. Отчёт (ст. 9).
+Latency, cost, ответ на вопрос (чем похожи виды), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset flowers102 --model resnet18 --pretrained --aug strong --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1014 --out_dir
+drive/out-var14-ft
+python evaluate.py --ckpt drive/out-var14-ft/best.pt --dataset flowers102 --model resnet18 \
+ --norm imagenet --size 224 --split val --seed 1014 --classical siftbow --processing --gradcam --
+robustness --latency --out_dir drive/eval-var14
+
+Артефакты: топ-5 пар путаницы с примерами, Grad-CAM на пары, отчёт.
+Ловушка: subset 20 классов должен совпадать с №15 (иначе сравнение CNN vs
+ViT нечестное).
+
+№15. Flowers102 + ViT-tiny transfer
+Суть: Flowers102 (тот же subset 20, что у №14), ViT-tiny transfer; фокус — CNN vs
+ViT на fine-grained. Вопрос: кто лучше на мелких различиях при равном
+бюджете обучения? : сравнить latency обеих моделей.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1015. flowers102, тот же
+subset 20 классов, что у №14. EDA + contact sheet. 2. Классика (ст. 2). Лист
+обработки. colorhist + HOG (concat) + LinearSVC: код блока 4, np.concatenate
+двух признаков. Комбинация цвет+форма. 3. Аугментации (ст. 3). strong.
+Абляция none vs strong. 4. Модель (ст. 4). vit_tiny + ImageNet (--pretrained).
+Params/память. 5. Обучение (ст. 5). AdamW lr 3e-4, transfer probe→FT (блок 9), --
+norm imagenet --size 224. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness;
+сравни с №14 (CNN) при равном бюджете. 7. Grad-CAM (ст. 7). Attention rollout
+для ViT; 5+5. 8. Перенос (ст. 8). Сравнение с №14: таблица CNN vs ViT (acc,
+macro-F1, время, params). 9. Отчёт (ст. 9). Latency обеих моделей (бонус), cost,
+ответ на вопрос (кто лучше), таблица классика/CNN/ViT.
+
+Команды:
+
+python train.py --dataset flowers102 --model vit_tiny --pretrained --aug strong --norm
+imagenet \
+ --size 224 --optimizer adamw --lr 3e-4 --scheduler cosine --epochs 10 --seed 1015 --out_dir
+drive/out-var15-ft
+python evaluate.py --ckpt drive/out-var15-ft/best.pt --dataset flowers102 --model vit_tiny \
+ --norm imagenet --size 224 --split val --seed 1015 --processing --gradcam --robustness --
+latency --out_dir drive/eval-var15
+<PARSED TEXT FOR PAGE: 23 / 41>
+Артефакты: таблица CNN vs ViT, latency обеих, concat-классика (код), отчёт.
+Ловушка: concat colorhist+HOG через --classical не сделать — код блока 4; и
+сравнивать с №14 на другом subset нельзя.
+
+№16. DTD текстуры + SmallCNN
+Суть: DTD (47 текстур), SmallCNN; фокус — текстуры без глобальной формы,
+роль GAP. Вопрос: текстуры без глобальной формы: помогает ли GAP и какие
+признаки выучиваются? : Grad-CAM — равномерное ли внимание по
+текстуре.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1016. dtd (47 классов,
+128×128). EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. LBP +
+LinearSVC: --classical lbp. Текстуры — родная стихия классики? 3. Аугментации
+(ст. 3). Random crop разных масштабов (правь блок 2: T.RandomResizedCrop).
+Абляция none vs policy. 4. Модель (ст. 4). smallcnn с GAP. Params/память;
+абляция GAP vs flatten (часть вопроса). 5. Обучение (ст. 5). SGD lr 0.1 cosine, 30
+эпох. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness. 7. Grad-CAM (ст.
+7). 5+5; равномерное ли внимание по текстуре (бонус). 8. Перенос (ст. 8).
+domain shift → синтетические паттерны: оцени на сгенерированных
+текстурах, дообучи; кривые адаптации. 9. Отчёт (ст. 9). Latency, cost, ответ на
+вопрос (GAP/признаки), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset dtd --model smallcnn --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1016 --out_dir drive/out-var16
+python evaluate.py --ckpt drive/out-var16/best.pt --dataset dtd --model smallcnn \
+ --split val --seed 1016 --classical lbp --processing --gradcam --robustness --latency --out_dir
+drive/eval-var16
+
+Артефакты: абляция GAP vs flatten, Grad-CAM текстур, таблица LBP, отчёт.
+Ловушка: для текстур flatten вместо GAP ломает инвариантность к позиции
+— это и есть предмет вопроса, не «исправляй» молча.
+
+№17. EuroSAT + ResNet-18 transfer
+Суть: EuroSAT (спутники, 10 классов), ResNet-18 transfer; фокус — перенос
+между сенсорами/масштабами. Вопрос: спутниковые снимки: перенос между
+сенсорами/масштабами? : per-class анализ (какие типы местности сложнее).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1017. eurosat (10 классов,
+64×64, офиц. test нет → 80/10/10). EDA + contact sheet. 2. Классика (ст. 2). Лист
+обработки. colorhist + HOG + LinearSVC: код блока 4, concat. Цвет vs структура
+местности. 3. Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст.
+4). resnet18 + ImageNet. Params/память. 5. Обучение (ст. 5). Transfer probe→FT
+10+10 (блок 9), --norm imagenet --size 224. Кривые, resume. 6. Оценка (ст. 6).
+Полная + robustness; per-class анализ (бонус). 7. Grad-CAM (ст. 7). 5+5; объект
+<PARSED TEXT FOR PAGE: 24 / 41>
+vs фон. 8. Перенос (ст. 8). domain shift → UC Merced: оцени на ucmerced,
+дообучи; кривые forgetting/адаптации между сенсорами. 9. Отчёт (ст. 9).
+Latency, cost, ответ на вопрос (перенос сенсоров), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset eurosat --model resnet18 --pretrained --aug basic --norm imagenet
+\
+  --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1017 --out_dir
+drive/out-var17-ft
+python evaluate.py --ckpt drive/out-var17-ft/best.pt --dataset eurosat --model resnet18 \
+  --norm imagenet --size 224 --split val --seed 1017 --processing --gradcam --robustness --
+latency --out_dir drive/eval-var17
+
+Артефакты: per-class анализ, кривые domain shift EuroSAT→UC Merced, concat-
+классика, отчёт. Ловушка: UC Merced скачивается вручную (ImageFolder
+root/ucmerced/train|test/<класс>) — без него стадия 8 не выполнить.
+
+№18. EuroSAT + SmallCNN scratch
+Суть: EuroSAT, SmallCNN scratch; фокус — окупается ли ImageNet-перенос на
+не-ImageNet домене. Вопрос: окупается ли ImageNet-перенос на домене,
+непохожем на ImageNet? : сравнить с №1 (CIFAR) — где перенос полезнее.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1018. eurosat. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC: --classical hog.
+Scratch CNN vs классика на не-ImageNet домене. 3. Аугментации (ст. 3). basic.
+Абляция none vs basic. 4. Модель (ст. 4). smallcnn scratch. Params/память. 5.
+Обучение (ст. 5). SGD lr 0.1 cosine, 30 эпох. Кривые, resume. 6. Оценка (ст. 6).
+Полная + robustness. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8).
+Сравнение с №17 (scratch vs transfer на спутниках): таблица scratch vs probe
+vs FT; бонус — сравнение с CIFAR (№1). 9. Отчёт (ст. 9). Latency, cost, ответ на
+вопрос (окупается ли перенос), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset eurosat --model smallcnn --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1018 --out_dir drive/out-var18
+python evaluate.py --ckpt drive/out-var18/best.pt --dataset eurosat --model smallcnn \
+ --split val --seed 1018 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var18
+
+Артефакты: таблица scratch vs transfer (с №17), сравнение с CIFAR, отчёт.
+Ловушка: сравнивать scratch и transfer на разных сплитах EuroSAT —
+используй один seed/сплит.
+<PARSED TEXT FOR PAGE: 25 / 41>
+№19. UC Merced + ResNet-18
+Суть: UC Merced (аэроснимки), ResNet-18; фокус — симметричность переноса
+между аэродоменами. Вопрос: симметричен ли перенос между
+аэродоменами? : объединённый датасет — мультидоменное обучение.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1019. ucmerced (вручную,
+ImageFolder root/ucmerced/train|test/<класс>). EDA + contact sheet. 2. Классика (ст.
+2). Лист обработки. HOG + colorhist + LinearSVC: код блока 4, concat. Классика
+как домен-независимая точка отсчёта. 3. Аугментации (ст. 3). basic. Абляция
+none vs basic. 4. Модель (ст. 4). resnet18 + ImageNet. Params/память. 5. Обучение
+(ст. 5). Transfer probe→FT 10+10 (блок 9), --norm imagenet --size 224. Кривые,
+resume. 6. Оценка (ст. 6). Полная + robustness. 7. Grad-CAM (ст. 7). 5+5; объект
+vs фон. 8. Перенос (ст. 8). domain shift → EuroSAT (обратное направление
+№17): оцени на eurosat, дообучи; сравни симметричность переноса A→B vs
+B→A. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (симметрия), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset ucmerced --model resnet18 --pretrained --aug basic --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1019 --out_dir
+drive/out-var19-ft
+python evaluate.py --ckpt drive/out-var19-ft/best.pt --dataset ucmerced --model resnet18 \
+ --norm imagenet --size 224 --split val --seed 1019 --processing --gradcam --robustness --
+latency --out_dir drive/eval-var19
+
+Артефакты: таблица переноса A→B vs B→A (с №17), мультидомен (бонус),
+отчёт. Ловушка: без ручной загрузки UC Merced датасет не откроется —
+заложи время на скачивание и раскладку по папкам.
+
+№20. Oxford Pets (кошки/собаки) + MobileNetV3
+Суть: Oxford Pets (37 пород), MobileNetV3; фокус — latency мобильной
+архитектуры. Вопрос: accuracy vs скорость: что теряет лёгкая модель
+(сравнить с №21)? : замер FPS на CPU и T4, таблица Pareto.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1020. oxford_pets (37 классов,
+224×224). EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. HOG +
+LinearSVC: --classical hog. Latency классического пайплайна vs MobileNetV3. 3.
+Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст. 4). mobilenet_v3
++ ImageNet. Params/память; обоснуй мобильный выбор. 5. Обучение (ст. 5).
+Transfer probe→FT 10+10 (блок 9), --norm imagenet --size 224. Кривые, resume. 6.
+Оценка (ст. 6). Полная + robustness; обязательный latency (batch=1, CPU и T4).
+7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8). few-shot по
+породам: блок 3 few_shot_indices, 3 запуска mean±std; сравни с №21 (DenseNet).
+<PARSED TEXT FOR PAGE: 26 / 41>
+9. Отчёт (ст. 9). Latency/FPS Pareto (бонус), cost, ответ на вопрос (что теряет
+лёгкая модель), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset oxford_pets --model mobilenet_v3 --pretrained --aug basic --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1020 --out_dir
+drive/out-var20-ft
+python evaluate.py --ckpt drive/out-var20-ft/best.pt --dataset oxford_pets --model
+mobilenet_v3 \
+ --norm imagenet --size 224 --split val --seed 1020 --classical hog --processing --gradcam --
+robustness --latency --out_dir drive/eval-var20
+
+Артефакты: таблица Pareto accuracy/FPS (CPU+T4), few-shot mean±std,
+сравнение с №21, отчёт. Ловушка: latency без прогрева и без
+torch.cuda.synchronize() — замеры шумные; следуй протоколу.
+
+№21. Oxford Pets + DenseNet-121 transfer
+Суть: Oxford Pets, DenseNet-121 transfer; фокус — Grad-CAM по породам
+(морда/уши/окрас). Вопрос: какие визуальные признаки различают породы
+(морда/уши/окрас)? : сравнить CAM с №20 — где лёгкая модель «смотрит не
+туда».
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1021. oxford_pets. EDA +
+contact sheet. 2. Классика (ст. 2). Лист обработки. SIFT-BoW + LinearSVC: --
+classical siftbow. Что ловят SIFT-ключевые точки пород? 3. Аугментации (ст. 3).
+basic. Абляция none vs basic. 4. Модель (ст. 4). densenet121 + ImageNet.
+Params/память. 5. Обучение (ст. 5). Transfer probe→FT 10+10 (блок 9), --norm
+imagenet --size 224. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness. 7.
+Grad-CAM (ст. 7). 5+5 по породам; какие детали (морда/уши/окрас) различает
+модель. 8. Перенос (ст. 8). transfer + FT: полный протокол probe→FT; таблица
+scratch vs probe vs FT. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (признаки
+пород), сравнение CAM с №20 (бонус), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset oxford_pets --model densenet121 --pretrained --aug basic --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1021 --out_dir
+drive/out-var21-ft
+python evaluate.py --ckpt drive/out-var21-ft/best.pt --dataset oxford_pets --model
+densenet121 \
+ --norm imagenet --size 224 --split val --seed 1021 --classical siftbow --processing --gradcam --
+robustness --latency --out_dir drive/eval-var21
+<PARSED TEXT FOR PAGE: 27 / 41>
+Артефакты: Grad-CAM по породам, сравнение CAM с №20, таблица SIFT-BoW,
+отчёт. Ловушка: целевой слой Grad-CAM у DenseNet — последний conv блока
+features, не classifier; проверь last_conv.
+
+№22. Food-101 (10 классов) + EfficientNet-B0 + mixup
+Суть: Food-101 subset 10, EfficientNet-B0 + mixup; фокус — mixup на текстурах
+еды. Вопрос: mixup на текстурах еды: регуляризация или размывание
+классов? : сравнить с №23 (cutmix) на семинаре.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1022. food101, отбери 10
+классов по seed. EDA + contact sheet. 2. Классика (ст. 2). Лист обработки.
+colorhist + LBP + LinearSVC: код блока 4, concat. Еда: цвет или микротекстура?
+3. Аугментации (ст. 3). basic + mixup (--mixup 1.0). Абляция none vs mixup. 4.
+Модель (ст. 4). efficientnet_b0 + ImageNet. Params/память. 5. Обучение (ст. 5).
+Transfer probe→FT 10+10 (блок 9) с mixup, --norm imagenet --size 224. Кривые,
+resume. 6. Оценка (ст. 6). Полная + robustness. 7. Grad-CAM (ст. 7). 5+5; объект
+vs фон/текстура. 8. Перенос (ст. 8). transfer + FT с mixup: сравни probe vs FT,
+влияние mixup на val. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (mixup:
+регуляризация/размывание), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset food101 --model efficientnet_b0 --pretrained --aug basic --mixup
+1.0 \
+  --norm imagenet --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed
+1022 --out_dir drive/out-var22-ft
+python evaluate.py --ckpt drive/out-var22-ft/best.pt --dataset food101 --model efficientnet_b0
+\
+  --norm imagenet --size 224 --split val --seed 1022 --processing --gradcam --robustness --
+latency --out_dir drive/eval-var22
+
+Артефакты: абляция mixup, визуализация смешанных батчей, сравнение с
+№23, concat-классика, отчёт. Ловушка: mixup применять к val/test — нельзя;
+только train. Иначе метрики недействительны.
+
+№23. Food-101 + ResNet-18 + cutmix
+Суть: Food-101 subset 10 (тот же, что у №22), ResNet-18 + cutmix; фокус — mixup
+vs cutmix. Вопрос: mixup vs cutmix: что лучше на мелких текстурах и почему?
+: визуализировать смешанные батчи обоих методов.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1023. food101, тот же subset
+10, что у №22. EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. LBP +
+LinearSVC: --classical lbp. Кто устойчивее к смешиванию текстур? 3.
+Аугментации (ст. 3). basic + cutmix (--cutmix 1.0). Абляция none vs cutmix. 4.
+Модель (ст. 4). resnet18 + ImageNet. Params/память. 5. Обучение (ст. 5). Transfer
+probe→FT 10+10 (блок 9) с cutmix, --norm imagenet --size 224. Кривые, resume. 6.
+<PARSED TEXT FOR PAGE: 28 / 41>
+Оценка (ст. 6). Полная + robustness; сравни с mixup (№22). 7. Grad-CAM (ст. 7).
+5+5; объект vs фон. 8. Перенос (ст. 8). transfer + FT с cutmix; сравнение mixup
+(№22): таблица cutmix vs mixup. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос
+(cutmix vs mixup), визуализация батчей (бонус), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset food101 --model resnet18 --pretrained --aug basic --cutmix 1.0 \
+ --norm imagenet --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed
+1023 --out_dir drive/out-var23-ft
+python evaluate.py --ckpt drive/out-var23-ft/best.pt --dataset food101 --model resnet18 \
+ --norm imagenet --size 224 --split val --seed 1023 --classical lbp --processing --gradcam --
+robustness --latency --out_dir drive/eval-var23
+
+Артефакты: визуализация cutmix/mixup батчей, таблица сравнения, отчёт.
+Ловушка: cutmix и mixup одновременно не включай (это отдельный режим);
+для сравнения — два разных прогона.
+
+№24. Caltech-101 (10 классов) + ResNet-18
+Суть: Caltech-101 subset 10, ResNet-18; фокус — гетерогенные классы и
+калибровка. Вопрос: какие классы «дороже» (самолёт vs краб vs пианино) и
+почему? : калибровка уверенности (ECE) по классам.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1024. caltech101, отбери 10
+классов по seed (офиц. test нет → 80/10/10). EDA + contact sheet. 2. Классика (ст.
+2). Лист обработки. SIFT-BoW + LinearSVC: --classical siftbow. Воспроизвести до-
+DL пайплайн Caltech. 3. Аугментации (ст. 3). basic. Абляция none vs basic. 4.
+Модель (ст. 4). resnet18 + ImageNet. Params/память. 5. Обучение (ст. 5). Transfer
+probe→FT 10+10 (блок 9), --norm imagenet --size 224. Кривые, resume. 6. Оценка
+(ст. 6). Полная + robustness; ECE (expected_calibration_error) по классам. 7.
+Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8). transfer; per-class
+анализ гетерогенных классов: какие классы сложнее и почему. 9. Отчёт (ст.
+9). Latency, cost, ответ на вопрос («дорогие» классы), ECE по классам (бонус),
+таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset caltech101 --model resnet18 --pretrained --aug basic --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1024 --out_dir
+drive/out-var24-ft
+python evaluate.py --ckpt drive/out-var24-ft/best.pt --dataset caltech101 --model resnet18 \
+ --norm imagenet --size 224 --split val --seed 1024 --classical siftbow --processing --gradcam --
+robustness --latency --out_dir drive/eval-var24
+<PARSED TEXT FOR PAGE: 29 / 41>
+Артефакты: per-class анализ, ECE по классам, таблица SIFT-BoW, отчёт.
+Ловушка: Caltech-101 гетерогенен (разные размеры/фоны) — без per-class
+анализа средний accuracy скрывает «дорогие» классы.
+
+№25. QuickDraw (10 категорий) + SmallCNN ★
+Суть: QuickDraw subset 10 (скетчи), SmallCNN; фокус — разреженные штрихи
+vs формы. Вопрос: разреженные скетчи: какие категории распознаются хуже
+(штрихи vs формы)? : сравнить с фотографическими доменами — сложность
+скетчей.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1025. quickdraw (вручную,
+ImageFolder root/quickdraw/train|test/<класс>), отбери 10 категорий. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки (skeletonize особенно показателен).
+raw pixels + kNN; skeletonize + HOG: код блока 4, два подхода. Штрихи vs
+формы. 3. Аугментации (ст. 3). rotate20 (±20°, без flip). Абляция none vs rotate20.
+4. Модель (ст. 4). smallcnn. Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine,
+30 эпох. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; per-class —
+какие категории хуже. 7. Grad-CAM (ст. 7). 5+5; на какие штрихи смотрит
+модель. 8. Перенос (ст. 8). domain shift → EMNIST: оцени на emnist, дообучи;
+кривые адаптации. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (штрихи vs
+формы), сравнение с фото-доменами (бонус), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset quickdraw --model smallcnn --aug rotate20 --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1025 --out_dir drive/out-var25
+python evaluate.py --ckpt drive/out-var25/best.pt --dataset quickdraw --model smallcnn \
+ --split val --seed 1025 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var25
+
+Артефакты: skeletonize-лист, таблица raw+kNN vs skeleton+HOG, per-class,
+отчёт. Ловушка: skeletonize+HOG и kNN — код блока 4, не --classical; QuickDraw
+нужно скачать и разложить вручную.
+
+№26. GTSRB (дорожные знаки) + ResNet-20
+Суть: GTSRB (43 знака), ResNet-20; фокус — safety-critical ошибки. Вопрос: цена
+ошибки: какие путаницы опасны и как их снизить (порог уверенности)? :
+rejection option — отказ при низкой уверенности, кривая coverage/accuracy.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1026. gtsrb (43 класса, 48×48).
+EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC +
+цветовые маски (красный/синий): код блока 4 (HSV-маски + HOG).
+Классический до-DL пайплайн знаков. 3. Аугментации (ст. 3). basic. Абляция
+none vs basic. 4. Модель (ст. 4). resnet20. Params/память. 5. Обучение (ст. 5).
+SGD lr 0.1 cosine, 30 эпох. Кривые, resume. 6. Оценка (ст. 6). Полная +
+<PARSED TEXT FOR PAGE: 30 / 41>
+robustness; фокус — опасные пары (похожие знаки, ограничения скорости).
+7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8). Дообучение на
+искажениях (темнота/дождь/blur): fine-tune с corruption-аугментациями;
+замер до/после на опасных парах. 9. Отчёт (ст. 9). Latency, cost, ответ на
+вопрос (цена ошибки), кривая coverage/accuracy (бонус), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset gtsrb --model resnet20 --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1026 --out_dir drive/out-var26
+python evaluate.py --ckpt drive/out-var26/best.pt --dataset gtsrb --model resnet20 \
+ --split val --seed 1026 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var26
+
+Артефакты: список опасных пар, кривая coverage/accuracy, цветовые маски
+(код), отчёт. Ловушка: смотреть только на accuracy — для safety-critical важны
+конкретные опасные пары, а не среднее.
+
+№27. GTSRB + MobileNetV3
+Суть: GTSRB, MobileNetV3; фокус — latency/FPS для встраиваемой системы.
+Вопрос: accuracy vs скорость для real-time: какой компромисс приемлем? :
+квантизация INT8 — потеря качества vs выигрыш скорости.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1027. gtsrb. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HSV-сегментация цвета + HOG +
+LinearSVC: код блока 4 (сегментация → HOG). Сегментация как признак. 3.
+Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст. 4). mobilenet_v3
++ ImageNet. Params/память; обоснуй встраиваемый выбор. 5. Обучение (ст. 5).
+Transfer probe→FT 10+10 (блок 9), --norm imagenet --size 224. Кривые, resume. 6.
+Оценка (ст. 6). Полная + robustness; обязательный latency/FPS (batch=1). 7.
+Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8). Сравнение с №26
+(ResNet-20): таблица accuracy/FPS/params; бонус — INT8-квантизация. 9. Отчёт
+(ст. 9). Latency/FPS, cost, ответ на вопрос (компромисс real-time), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset gtsrb --model mobilenet_v3 --pretrained --aug basic --norm
+imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1027 --out_dir
+drive/out-var27-ft
+python evaluate.py --ckpt drive/out-var27-ft/best.pt --dataset gtsrb --model mobilenet_v3 \
+ --norm imagenet --size 224 --split val --seed 1027 --processing --gradcam --robustness --
+latency --out_dir drive/eval-var27
+<PARSED TEXT FOR PAGE: 31 / 41>
+Артефакты: таблица accuracy/FPS vs №26, INT8 до/после (бонус), HSV-
+сегментация (код), отчёт. Ловушка: INT8-квантизация без замера потери
+accuracy — вывод о «выигрыше» неполный; всегда до/после.
+
+№28. UTKFace (возрастные группы) + ResNet-18
+Суть: UTKFace (возрастные группы), ResNet-18; фокус — Grad-CAM + этика/bias.
+Вопрос: какие признаки модель использует для возраста; есть ли перекосы
+по подгруппам? : раздел «Этические ограничения» в отчёте (риски, bias,
+применения).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1028. utkface (вручную;
+возрастные группы собираются из имён файлов — скрипт парсинга
+приложи сам, это часть задания). EDA + contact sheet. 2. Классика (ст. 2). Лист
+обработки. HOG + LinearSVC: --classical hog. Bias ручных признаков vs CNN. 3.
+Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст. 4). resnet18 +
+ImageNet. Params/память. 5. Обучение (ст. 5). Transfer probe→FT 10+10 (блок 9),
+--norm imagenet --size 224. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness;
+per-class/подгруппы — есть ли перекосы. 7. Grad-CAM (ст. 7). 5+5; какие
+признаки модель использует для возраста. 8. Перенос (ст. 8).
+Сбалансированное дообучение: weighted loss/oversampling по подгруппам;
+per-class F1 до/после. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос
+(признаки/bias), раздел «Этические ограничения» (бонус), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset utkface --model resnet18 --pretrained --aug basic --norm imagenet
+\
+  --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1028 --out_dir
+drive/out-var28-ft
+python evaluate.py --ckpt drive/out-var28-ft/best.pt --dataset utkface --model resnet18 \
+  --norm imagenet --size 224 --split val --seed 1028 --classical hog --processing --gradcam --
+robustness --latency --out_dir drive/eval-var28
+
+Артефакты: скрипт парсинга возраста, анализ перекосов по подгруппам,
+этический раздел, отчёт. Ловушка: без собственного скрипта парсинга имён
+файлов возрастные группы не собрать — это обязательная часть стадии 1.
+
+№29. Синтетика: фигуры + SmallCNN ★ (CPU-friendly)
+Суть: синтетические фигуры (круг/квадрат/треугольник), SmallCNN; фокус —
+генерализация на невиданные комбинации. Вопрос: генерализация на
+невиданные комбинации (новый цвет известной формы)? : тест на сдвиг
+позиции/масштаба — инвариантность.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1029. synthetic (SyntheticShapes,
+3 класса, генератор в шаблоне — приложи скрипт). EDA + contact sheet. 2.
+<PARSED TEXT FOR PAGE: 32 / 41>
+Классика (ст. 2). Лист обработки. моменты Hu + kNN: код блока 4, kind='hu',
+clf='knn'. Инвариантные моменты формы. 3. Аугментации (ст. 3). basic
+(сдвиг/масштаб через crop). Абляция none vs basic. 4. Модель (ст. 4). smallcnn.
+Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 20 эпох. Кривые, resume.
+6. Оценка (ст. 6). Полная + robustness; тест на невиданные комбинации
+(новый цвет известной формы). 7. Grad-CAM (ст. 7). 5+5; смотрит ли модель на
+форму или на цвет. 8. Перенос (ст. 8). curriculum (простое→сложное):
+сначала крупные центрированные фигуры, затем мелкие/смещённые; кривая
+обучения. 9. Отчёт (ст. 9). Latency (CPU), cost, ответ на вопрос (генерализация),
+тест инвариантности (бонус), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset synthetic --model smallcnn --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 20 --seed 1029 --out_dir drive/out-var29
+python evaluate.py --ckpt drive/out-var29/best.pt --dataset synthetic --model smallcnn \
+ --split val --seed 1029 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var29
+
+Артефакты: генератор синтетики, тест невиданных комбинаций, таблица
+Hu+kNN, отчёт. Ловушка: моменты Hu до 3-го порядка НЕ различают круг и
+квадрат (оба изотропны) — не жди от них 100% и объясни это в отчёте.
+
+№30. Синтетика: фигуры + MLP ★ (CPU-friendly)
+Суть: синтетические фигуры, MLP; фокус — пространственная
+инвариантность CNN vs MLP. Вопрос: CNN vs MLP: откуда берётся
+пространственная инвариантность? : визуализировать, где MLP ломается
+(heatmap ошибок по позициям).
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1030. synthetic. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. моменты Hu vs raw pixels + kNN:
+код блока 4, clf='knn', два kind (hu, raw). Откуда инвариантность в классике? 3.
+Аугментации (ст. 3). none vs basic (сдвиг/масштаб). Абляция обязательна. 4.
+Модель (ст. 4). mlp. Params/память; выровняй с №29 (SmallCNN) для честного
+сравнения. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 20 эпох. Кривые, resume. 6.
+Оценка (ст. 6). Полная + robustness; фокус — инвариантность
+(сдвиг/масштаб/поворот). 7. Grad-CAM (ст. 7). Для MLP — saliency; 5+5 ошибок.
+8. Перенос (ст. 8). Сравнение с №29 (CNN vs MLP): таблица инвариантности;
+heatmap ошибок по позициям (бонус). 9. Отчёт (ст. 9). Latency (CPU), cost, ответ
+на вопрос (инвариантность), таблица классика/MLP/CNN.
+
+Команды:
+
+python train.py --dataset synthetic --model mlp --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 20 --seed 1030 --out_dir drive/out-var30
+python evaluate.py --ckpt drive/out-var30/best.pt --dataset synthetic --model mlp \
+ --split val --seed 1030 --processing --robustness --latency --out_dir drive/eval-var30
+<PARSED TEXT FOR PAGE: 33 / 41>
+Артефакты: heatmap ошибок по позициям, таблица Hu vs raw + kNN,
+сравнение с №29, отчёт. Ловушка: MLP без аугментаций сдвига «ломается» на
+новых позициях — это и есть предмет вопроса, покажи heatmap, а не
+скрывай.
+
+№31. CIFAR-10 + абляция аугментаций
+Суть: CIFAR-10, SmallCNN, 4 политики аугментаций; фокус — вклад каждого
+уровня. Вопрос: сколько accuracy даёт каждый уровень аугментаций и где
+насыщение? : время обучения vs выигрыш — compute-эффективность
+аугментаций.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1031. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC: --classical hog.
+Фиксированная точка отсчёта для абляции. 3. Аугментации (ст. 3). 4
+прогона: none / basic / strong / strong+cutmix (--aug strong --cutmix 1.0). Одинаковые
+модель/seed/эпохи. 4. Модель (ст. 4). smallcnn. Params/память. 5. Обучение (ст.
+5). SGD lr 0.1 cosine, 30 эпох × 4. Кривые, resume для каждого. 6. Оценка (ст. 6).
+Полная + robustness; таблица Δ val acc по политикам, кривые насыщения. 7.
+Grad-CAM (ст. 7). 5+5 для лучшей политики; объект vs фон. 8. Перенос (ст. 8).
+Лучшая политика → transfer ResNet-18: probe→FT (блок 9), --norm imagenet --
+size 224. 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (насыщение), compute-
+эффективность (бонус), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model smallcnn --aug strong --cutmix 1.0 --optimizer sgd \
+ --lr 0.1 --scheduler cosine --epochs 30 --seed 1031 --out_dir drive/out-var31-strong-cutmix
+python evaluate.py --ckpt drive/out-var31-strong-cutmix/best.pt --dataset cifar10 --model
+smallcnn \
+ --split val --seed 1031 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var31
+
+Артефакты: таблица 4 политик (Δ acc + время), кривые, отчёт. Ловушка:
+менять seed/эпохи между политиками — абляция недействительна; всё
+одинаковое, кроме аугментаций.
+
+№32. CIFAR-10 + sweep оптимизаторов
+Суть: CIFAR-10, ResNet-18, 3 оптимизатора; фокус — SGD+momentum vs
+Adam/AdamW. Вопрос: почему SGD+momentum часто лучше Adam на CNN
+(обобщение vs скорость)? : добавить LAMB/Lion (timm) — четвёртый прогон.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1032. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC: --classical hog.
+Точка отсчёта: классика без оптимизации. 3. Аугментации (ст. 3). basic.
+Абляция none vs basic (для лучшего оптимизатора). 4. Модель (ст. 4). resnet18.
+Params/память. 5. Обучение (ст. 5). 3 прогона: SGD+momentum (lr 0.1) / Adam
+<PARSED TEXT FOR PAGE: 34 / 41>
+(lr 1e-3) / AdamW (lr 1e-3), cosine, 30 эпох. Подбери lr каждому. Кривые, resume.
+6. Оценка (ст. 6). Полная + robustness; таблица acc/скорость сходимости по
+оптимизаторам. 7. Grad-CAM (ст. 7). 5+5 для лучшего; объект vs фон. 8.
+Перенос (ст. 8). Лучший оптимизатор → FT: transfer probe→FT (блок 9). 9.
+Отчёт (ст. 9). Latency, cost, ответ на вопрос (обобщение vs скорость), таблица
+классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug basic --optimizer adamw --lr 1e-3 \
+ --scheduler cosine --epochs 30 --seed 1032 --out_dir drive/out-var32-adamw
+python evaluate.py --ckpt drive/out-var32-adamw/best.pt --dataset cifar10 --model resnet18 \
+ --split val --seed 1032 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var32
+
+Артефакты: таблица 3 оптимизаторов (acc + кривые), подбор lr, отчёт.
+Ловушка: сравнивать оптимизаторы с одним lr без подбора — Adam с lr 0.1
+разойдётся; каждому свой lr.
+
+№33. CIFAR-10 + sweep расписаний LR
+Суть: CIFAR-10, ResNet-18, 3 расписания LR; фокус — влияние расписания на
+качество/сходимость. Вопрос: как расписание влияет на финальное качество
+и скорость сходимости? : warmup-абляция к лучшему расписанию.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1033. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC: --classical hog.
+Точка отсчёта: классика без расписания. 3. Аугментации (ст. 3). basic.
+Абляция none vs basic. 4. Модель (ст. 4). resnet18. Params/память. 5. Обучение
+(ст. 5). 3 прогона: --scheduler step / cosine / onecycle, SGD lr 0.1, 30 эпох. Кривые lr,
+resume. 6. Оценка (ст. 6). Полная + robustness; таблица acc/скорость
+сходимости по расписаниям. 7. Grad-CAM (ст. 7). 5+5 для лучшего; объект vs
+фон. 8. Перенос (ст. 8). Лучшее расписание → FT: transfer probe→FT (блок 9). 9.
+Отчёт (ст. 9). Latency, cost, ответ на вопрос (расписание), warmup-абляция
+(бонус), таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug basic --optimizer sgd --lr 0.1 \
+  --scheduler onecycle --epochs 30 --seed 1033 --out_dir drive/out-var33-onecycle
+python evaluate.py --ckpt drive/out-var33-onecycle/best.pt --dataset cifar10 --model resnet18
+\
+  --split val --seed 1033 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var33
+
+Артефакты: кривые lr + acc для 3 расписаний, warmup-абляция, отчёт.
+Ловушка: onecycle требует lr как пик и шагов по батчам — не переноси
+настройки cosine механически.
+<PARSED TEXT FOR PAGE: 35 / 41>
+№34. CIFAR-10 + регуляризация
+Суть: CIFAR-10, ResNet-18, 4 регуляризатора; фокус — какой эффективнее на
+50k. Вопрос: какой регуляризатор эффективнее на 50k изображений и
+почему? : комбинация двух лучших — синергия или нет.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1034. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC, sweep C ∈ {0.1, 1,
+10}: код блока 4, цикл по C. Регуляризация в SVM vs CNN. 3. Аугментации (ст.
+3). basic. Абляция none vs basic. 4. Модель (ст. 4). resnet18. 4 конфигурации:
+baseline / dropout / label smoothing (--label_smoothing 0.1) / BN→GroupNorm
+(replace_bn_with_gn, блок 5). Diff приложи. 5. Обучение (ст. 5). SGD lr 0.1 cosine,
+30 эпох × 4. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; таблица acc
+по регуляризаторам, train/val gap. 7. Grad-CAM (ст. 7). 5+5 для лучшего; объект
+vs фон. 8. Перенос (ст. 8). Лучшая конфигурация → transfer: probe→FT (блок
+9). 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (какой регуляризатор), sweep
+C классики, таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug basic --label_smoothing 0.1 --
+optimizer sgd \
+ --lr 0.1 --scheduler cosine --epochs 30 --seed 1034 --out_dir drive/out-var34-ls
+python evaluate.py --ckpt drive/out-var34-ls/best.pt --dataset cifar10 --model resnet18 \
+ --split val --seed 1034 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var34
+
+Артефакты: diff модификаций, таблица 4 регуляризаторов, sweep C (код),
+отчёт. Ловушка: sweep C через --classical не сделать (фиксированный C=1) —
+нужен код блока 4 с циклом.
+
+№35. CIFAR-10 + long-tail
+Суть: CIFAR-10 искусственный long-tail, ResNet-18; фокус — что лечит
+дисбаланс. Вопрос: что лечит дисбаланс: данные, loss или и то и другое
+(macro-F1)? : deferred re-weighting (DRW) — четвёртый метод.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1035. cifar10, построй long-
+tail: блок 3 long_tail_indices(targets, ratio=100, seed), подставь в train-сплит. EDA:
+гистограмма «хвоста». 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC
+(balanced): код блока 4, balanced=True. class_weight vs focal loss у CNN. 3.
+Аугментации (ст. 3). basic. Абляция none vs basic. 4. Модель (ст. 4). resnet18.
+Params/память. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 30 эпох. Кривые, resume.
+6. Оценка (ст. 6). Полная + robustness; главная метрика — macro-F1, per-class
+F1. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8). 3 прогона:
+weighted loss / oversampling (WeightedRandomSampler) / focal loss (напиши по
+arXiv:1708.02002); per-class F1 до/после. Бонус — DRW. 9. Отчёт (ст. 9). Latency,
+cost, ответ на вопрос (данные/loss), таблица классика/scratch/imbalance.
+<PARSED TEXT FOR PAGE: 36 / 41>
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1035 --out_dir drive/out-var35
+python evaluate.py --ckpt drive/out-var35/best.pt --dataset cifar10 --model resnet18 \
+ --split val --seed 1035 --processing --gradcam --robustness --latency --out_dir drive/eval-
+var35
+
+Артефакты: гистограмма long-tail, таблица 3 методов (macro-F1/per-class), focal
+loss код, отчёт. Ловушка: оценивать long-tail по accuracy — редкие классы
+«тонут»; только macro-F1 и per-class F1.
+
+№36. CIFAR-10 + дистилляция ★
+Суть: CIFAR-10, teacher ResNet-50 → student SmallCNN; фокус — knowledge
+distillation. Вопрос: сколько качества teacher передаётся student при ×50
+меньших параметрах? : sweep температуры T ∈ {2, 4, 8}.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1036. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC: --classical hog.
+Третья точка: teacher vs student vs классика. 3. Аугментации (ст. 3). basic.
+Абляция none vs basic. 4. Модель (ст. 4). Teacher resnet50 (transfer, обучить),
+student smallcnn. Params обоих (×50 разница). 5. Обучение (ст. 5). Teacher:
+transfer probe→FT. Student: scratch 30 эпох и distilled (блок 11 kd_loss, T=4, α=0.7).
+Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; таблица teacher /
+student scratch / student distilled. 7. Grad-CAM (ст. 7). 5+5 для student; объект vs
+фон. 8. Перенос (ст. 8). Knowledge distillation: soft targets T=4, α=0.7; сравни
+student scratch vs distilled; sweep T (бонус). 9. Отчёт (ст. 9). Latency student vs
+teacher, cost, ответ на вопрос (передача качества), таблица
+классика/teacher/student.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet50 --pretrained --aug basic --norm imagenet \
+ --size 224 --optimizer sgd --lr 1e-3 --scheduler cosine --epochs 10 --seed 1036 --out_dir
+drive/out-var36-teacher
+python evaluate.py --ckpt drive/out-var36-teacher/best.pt --dataset cifar10 --model resnet50 \
+ --norm imagenet --size 224 --split val --seed 1036 --classical hog --processing --gradcam --
+robustness --latency --out_dir drive/eval-var36
+
+Артефакты: код kd_loss, таблица teacher/student scratch/distilled, sweep T,
+отчёт. Ловушка: KD-loss без множителя T² — градиенты soft-targets занижены;
+используй kd_loss из блока 11 как есть.
+
+№37. CIFAR-10 + прунинг и квантизация ★
+Суть: CIFAR-10, ResNet-18; фокус — accuracy vs latency vs размер (deployment).
+Вопрос: что дешевле для deployment: прунинг или квантизация, и можно ли
+совмещать? : fine-tune после прунинга — восстановление качества.
+<PARSED TEXT FOR PAGE: 37 / 41>
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1037. cifar10. EDA + contact
+sheet. 2. Классика (ст. 2). Лист обработки. HOG + LinearSVC: --classical hog.
+Deployment-эталон: размер/latency классики. 3. Аугментации (ст. 3). basic.
+Абляция none vs basic. 4. Модель (ст. 4). resnet18 (обучить).
+Params/память/размер файла. 5. Обучение (ст. 5). SGD lr 0.1 cosine, 30 эпох.
+Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; таблица Pareto
+accuracy/latency/размер. 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст.
+8). Прунинг 50% каналов + INT8-квантизация (по отдельности и вместе, блок
+11 — отправные точки, реализация твоя); fine-tune после прунинга (бонус). 9.
+Отчёт (ст. 9). Latency/размер до/после, cost, ответ на вопрос (что дешевле),
+таблица классика/scratch/pruned/quant.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug basic --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1037 --out_dir drive/out-var37
+python evaluate.py --ckpt drive/out-var37/best.pt --dataset cifar10 --model resnet18 \
+ --split val --seed 1037 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var37
+
+Артефакты: таблица Pareto (4 конфигурации), код прунинга/квантизации,
+отчёт. Ловушка: прунинг без fine-tune резко роняет acc — замеряй и
+восстановление после дообучения.
+
+№38. CIFAR-10 + self-supervised ★
+Суть: CIFAR-10, SSL-предобучение → linear probe; фокус — экономия меток.
+Вопрос: сколько меток экономит self-supervised предобучение (accuracy vs
+число меток)? : кривая probe accuracy при 10/50/100% меток.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1038. cifar10; unlabeled train
+для SSL. EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. HOG +
+LinearSVC: --classical hog. Точка отсчёта кривой label-efficiency. 3. Аугментации
+(ст. 3). strong (для SSL — контрастные пары). Абляция none vs strong. 4. Модель
+(ст. 4). Backbone smallcnn/resnet18. Params/память. 5. Обучение (ст. 5). SSL:
+SimCLR-lite или rotation prediction (блок 11, реализация твоя) на unlabeled →
+linear probe. Кривые, resume. 6. Оценка (ст. 6). Полная + robustness; сравни с
+supervised (№1). 7. Grad-CAM (ст. 7). 5+5; объект vs фон. 8. Перенос (ст. 8). SSL
+→ linear probe → сравнение с supervised: кривая probe acc при 10/50/100%
+меток (бонус). 9. Отчёт (ст. 9). Latency, cost, ответ на вопрос (экономия меток),
+кривая label-efficiency, таблица классика/supervised/SSL.
+
+Команды:
+
+python train.py --dataset cifar10 --model resnet18 --aug strong --optimizer sgd --lr 0.1 \
+ --scheduler cosine --epochs 30 --seed 1038 --out_dir drive/out-var38-supervised
+python evaluate.py --ckpt drive/out-var38-supervised/best.pt --dataset cifar10 --model
+resnet18 \
+<PARSED TEXT FOR PAGE: 38 / 41>
+ --split val --seed 1038 --classical hog --processing --gradcam --robustness --latency --out_dir
+drive/eval-var38
+
+Артефакты: код SSL, кривая label-efficiency (10/50/100%), сравнение с
+supervised, отчёт. Ловушка: SSL-probe оценивать на тех же метках, что и SSL-
+предобучение — утечка; probe только на отдельном labeled subset.
+
+№39. Capstone: максимальный пайплайн ★
+Суть: CIFAR-10/100, EfficientNet-B0 или ViT-tiny transfer; фокус — максимум
+accuracy при бюджете T4 30 минут. Вопрос: максимум accuracy при бюджете
+T4 30 минут — что даёт каждый компонент (абляционная таблица)? :
+сравнить с №1 и разобрать вклад каждого улучшения.
+
+Что делать по стадиям: 1. Данные (ст. 0–1). Seed 1039. cifar10 (или cifar100).
+EDA + contact sheet. 2. Классика (ст. 2). Лист обработки. HOG + SIFT-BoW +
+colorhist (concat) + LinearSVC: код блока 4, concat трёх признаков. Полный
+классический стек vs DL-ансамбль. 3. Аугментации (ст. 3). strong + mixup (--aug
+strong --mixup 1.0). Абляция none vs strong+mixup. 4. Модель (ст. 4). efficientnet_b0
+или vit_tiny + ImageNet. Params/память. 5. Обучение (ст. 5). AdamW lr 3e-4 +
+cosine + label smoothing 0.1 + AMP (--amp), transfer probe→FT (блок 9), --norm
+imagenet --size 224. Кривые, resume. 6. Оценка (ст. 6). Полный набор + TTA (блок
+11 tta_predict) + ensemble из 2 моделей; финальный test-замер один раз. 7. Grad-
+CAM (ст. 7). 5+5 (attention rollout для ViT); объект vs фон. 8. Перенос (ст. 8).
+transfer + FT + TTA: абляционная таблица вклада каждого компонента
+(аугментации/mixup/TTA/ensemble/AMP). 9. Отчёт (ст. 9). Latency, cost (бюджет
+30 мин T4), ответ на вопрос (вклад компонентов), сравнение с №1 (бонус),
+таблица классика/scratch/transfer.
+
+Команды:
+
+python train.py --dataset cifar10 --model efficientnet_b0 --pretrained --aug strong --mixup
+1.0 \
+  --label_smoothing 0.1 --amp --norm imagenet --size 224 --optimizer adamw --lr 3e-4 \
+  --scheduler cosine --epochs 10 --seed 1039 --out_dir drive/out-var39-ft
+python evaluate.py --ckpt drive/out-var39-ft/best.pt --dataset cifar10 --model efficientnet_b0
+\
+  --norm imagenet --size 224 --split val --seed 1039 --processing --gradcam --robustness --
+latency --out_dir drive/eval-var39
+
+Артефакты: абляционная таблица компонентов, TTA+ensemble код, concat-
+классика, сравнение с №1, отчёт. Ловушка: включить все компоненты сразу
+без абляции — нельзя ответить, что именно дало выигрыш; добавляй по
+одному.
+<PARSED TEXT FOR PAGE: 39 / 41>
+Глоссарий
+Термин                      Значение
+Epoch / batch / iteration   эпоха = весь train; batch = порция;
+                            iteration = один шаг оптимизатора
+Overfitting                 train качество ≫ val; лечение:
+                            аугментации, регуляризация, early
+                            stopping, данные
+Аугментации                 искусственные преобразования train-
+                            изображений (flip/crop/color/mixup)
+                            для обобщения
+Mixup / CutMix              смешивание двух изображений и
+                            меток (линейно / вырезанием
+                            области)
+RandAugment                 случайная комбинация N
+                            аугментаций силы M из
+                            фиксированного набора
+Backbone / head             свёрточная часть, извлекающая
+                            признаки / классификатор поверх
+                            них
+Transfer learning           перенос весов, обученных на
+                            большом датасете (ImageNet), на свою
+                            задачу
+Linear probe                обучение только головы при
+                            замороженном backbone
+Fine-tuning (FT)            дообучение всей сети (обычно с
+                            малым lr для backbone)
+Заморозка                   requires_grad=False: веса не
+                            обновляются
+Domain shift                сдвиг распределения данных между
+                            доменами (MNIST→SVHN)
+Catastrophic forgetting     потеря качества на исходном домене
+                            при дообучении на новом
+Few-shot                    обучение на k примерах на класс
+Long-tail / дисбаланс       классы с сильно разным числом
+                            примеров; macro-F1 вместо accuracy
+Focal loss                  loss, понижающий вклад лёгких
+                            примеров (для дисбаланса)
+Label smoothing             смягчение one-hot меток (1−ε и
+                            ε/(C−1)) — регуляризация
+Confusion matrix            матрица «истинный класс ×
+<PARSED TEXT FOR PAGE: 40 / 41>
+Термин                    Значение
+                          предсказанный»
+Precision / Recall / F1   точность / полнота / их
+                          гармоническое среднее
+Top-k accuracy            верный класс среди k лучших
+                          предсказаний
+ECE                       expected calibration error:
+                          расхождение уверенности и точности
+Grad-CAM                  карта внимания: градиенты целевого
+                          класса по картам признаков
+                          последнего conv
+TTA                       test-time augmentation: усреднение
+                          предсказаний по аугментациям теста
+Ensemble                  усреднение предсказаний нескольких
+                          моделей
+Дистилляция               обучение student на soft-targets teacher
+                          (T — температура)
+Прунинг / квантизация     удаление каналов / понижение
+                          точности весов (INT8) для ускорения
+SSL / SimCLR              self-supervised обучение без меток
+                          (контрастное)
+Latency / FPS             время на изображение / кадров в
+                          секунду (batch=1)
+AMP / fp16                автоматическая смешанная точность
+                          для ускорения на GPU
+Градиент / Sobel          оператор производной яркости;
+                          выделяет границы и направление
+                          перепада
+Canny                     детектор границ: градиент +
+                          подавление немаксимумов + двойной
+                          порог
+Otsu                      автоматический порог бинаризации
+                          по максимуму межклассовой
+                          дисперсии
+Морфология                opening/closing (убрать шум/замкнуть
+                          разрывы), skeletonize (скелет формы)
+HOG                       гистограмма ориентированных
+                          градиентов по ячейкам —
+                          классический дескриптор формы
+SIFT / BoW                локальные инвариантные
+<PARSED TEXT FOR PAGE: 41 / 41>
+Термин                                          Значение
+                                                дескрипторы ключевых точек; bag-of-
+                                                words — гистограмма «визуальных
+                                                слов»
+LBP                                             local binary patterns: микротекстура
+                                                через сравнение пикселя с соседями
+Моменты Hu                                      7 инвариантов к
+                                                сдвигу/масштабу/повороту для формы
+                                                бинарного объекта
+SVM / kNN                                       классические классификаторы: макс.
+                                                зазор / голосование соседей
+Визуальный словарь                              кластеры SIFT-дескрипторов
+                                                (KMeans), заменяющие непрерывные
+                                                признаки кодами слов
+
+
+
+Приложение. Полезные команды
+# обучение (код train/evaluate — в starter-templates-cv.md, сохранить как train.py /
+evaluate.py)
+python train.py --dataset cifar10 --model smallcnn --aug basic --epochs 30 \
+ --optimizer sgd --lr 0.1 --scheduler cosine --seed 1001 --out_dir drive/out-var1
+
+# resume
+python train.py ... --out_dir drive/out-var1 --resume
+
+# оценка + классика + Grad-CAM + latency
+python evaluate.py --ckpt drive/out-var1/best.pt --classical hog --processing --gradcam --
+robustness --latency
+
+Первоисточники
+CS231n: Convolutional Neural Networks for Visual Recognition · Szeliski, Computer
+Vision: Algorithms and Applications (бесплатная книга) · PyTorch transfer
+learning tutorial · Grad-CAM (2016) · ResNet (2015) · ViT (2020) · mixup (2017) ·
+CutMix (2019) · RandAugment (2019) · Focal Loss (2017) · Knowledge Distillation
+(2015) · SimCLR (2020) · MobileNetV3 (2019) · EfficientNet (2019) · SIFT (Lowe, 2004) ·
+Dalal & Triggs, Histograms of Oriented Gradients for Human Detection (CVPR 2005) ·
+Canny, A Computational Approach to Edge Detection (TPAMI 1986) · Otsu, A
+Threshold Selection Method from Gray-Level Histograms (1979)

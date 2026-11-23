@@ -1,0 +1,8 @@
+{
+  "state": "executed_requires_review",
+  "stage": "train",
+  "actual_model_metrics": true,
+  "smoke": true,
+  "test_executed": false,
+  "remaining": "Inspect images, fill REPORT_NOTES.md, verify per-variant requirements, then perform one final test."
+}

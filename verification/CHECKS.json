@@ -1,0 +1,9 @@
+{
+  "tests_passed": 22,
+  "smoke_variant": 29,
+  "smoke_train_images": 120,
+  "smoke_val_images": 48,
+  "smoke_epochs": 2,
+  "full_colab_runs_completed": 0,
+  "original_poetry_notebook_fetched": false
+}

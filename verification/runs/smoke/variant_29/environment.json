@@ -1,0 +1,14 @@
+{
+  "python": "3.14.6",
+  "packages": {
+    "torch": "2.14.0",
+    "torchvision": "0.29.1",
+    "numpy": "2.5.3",
+    "scikit-learn": "1.9.1",
+    "timm": null,
+    "transformers": "5.23.0",
+    "scikit-image": null
+  },
+  "cuda": false,
+  "gpu": null
+}

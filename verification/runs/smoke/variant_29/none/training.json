@@ -1,0 +1,11 @@
+{
+  "phase": "scratch",
+  "epochs_completed": 2,
+  "best_val_accuracy": 0.3541666567325592,
+  "train_seconds": 1.3811533999996755,
+  "resumed": true,
+  "parameters": 1147971,
+  "trainable_parameters": 1147971,
+  "checkpoint_bytes": 9223655,
+  "smoke": true
+}

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+data/
+upstream/
+runs/**/best.pt
+runs/**/last.pt
+runs/**/*.pkl
+runs/**/physical_pruned_model.pt
+poetry/checkpoints/
+*.zip

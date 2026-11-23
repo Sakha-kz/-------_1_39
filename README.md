@@ -5,6 +5,13 @@
 ### Ф.И.О. преподавателя
 ### Ботайбеков А.О.
 
+### colab:
+<img width="1908" height="864" alt="39 задание 13 варянт" src="https://github.com/user-attachments/assets/659b390c-7b09-414f-8f22-2ca207e79607" />
+
+### drive google:
+<img width="1909" height="911" alt="39 задание 13 варянт диск" src="https://github.com/user-attachments/assets/780c7a10-9950-46ad-8c26-ab2e67f9f2e8" />
+
+
 # Компьютерное зрение — 39 вариантов и Persian Poetry Fine-Tuning
 
 Репозиторий содержит код для всех 39 вариантов из `39-cv.doc`, Colab-ноутбуки,
